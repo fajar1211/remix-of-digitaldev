@@ -52,37 +52,33 @@ export default function Billing() {
     return m;
   }, [durationRows]);
 
-  const baseTotalUsd = useMemo(() => {
+  const isMonthly = (() => {
+    const n = String(state.selectedPackageName ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+    return n.includes("full digital marketing") || n.includes("blog + social media") || n.includes("blog+social media");
+  })();
+
+  const durationPriceIdr = useMemo(() => {
     if (!state.subscriptionYears) return null;
 
-    const months = Number(state.subscriptionYears) * 12;
-    const discountPercent = discountByMonths.get(months) ?? 0;
-
-    // Prefer Duration & Discount config (package_durations)
-    if (discountByMonths.size > 0) {
-      const domain = pricing.domainPriceUsd ?? null;
-      const pkg = pricing.packagePriceUsd ?? null;
-      if (domain == null || pkg == null) return null;
-
-      const baseAnnual = domain + pkg;
-      const monthly = baseAnnual / 12;
-      return computeDiscountedTotal({ monthlyPrice: monthly, months, discountPercent }) + addOnsTotal;
+    if (isMonthly) {
+      const monthlyBase = Number(pricing?.packagePriceUsd ?? 0);
+      if (!Number.isFinite(monthlyBase) || monthlyBase <= 0) return null;
+      const months = Number(state.subscriptionYears) * 12;
+      const discountPercent = discountByMonths.get(months) ?? 0;
+      return computeDiscountedTotal({ monthlyPrice: monthlyBase, months, discountPercent });
     }
 
-    // Fallback to website_settings.order_subscription_plans
+    // Non-monthly: use subscription plan price
     const selectedPlan = (subscriptionPlans || []).find((p: any) => Number(p?.years) === Number(state.subscriptionYears));
-    const planOverrideUsd = (() => {
-      const v = Number((selectedPlan as any)?.price_usd);
-      return Number.isFinite(v) ? v : null;
-    })();
-    if (planOverrideUsd != null) return planOverrideUsd + addOnsTotal;
+    const v = Number((selectedPlan as any)?.price_usd ?? 0);
+    return Number.isFinite(v) && v > 0 ? v : null;
+  }, [discountByMonths, isMonthly, pricing?.packagePriceUsd, state.subscriptionYears, subscriptionPlans]);
 
-    const domainUsd = pricing.domainPriceUsd ?? null;
-    const pkgUsd = pricing.packagePriceUsd ?? null;
-    if (domainUsd == null || pkgUsd == null) return null;
-
-    return (domainUsd + pkgUsd) * state.subscriptionYears + addOnsTotal;
-  }, [addOnsTotal, discountByMonths, pricing.domainPriceUsd, pricing.packagePriceUsd, state.subscriptionYears, subscriptionPlans]);
+  const baseTotalUsd = useMemo(() => {
+    if (!state.subscriptionYears) return null;
+    if (durationPriceIdr == null) return null;
+    return durationPriceIdr + addOnsTotal;
+  }, [addOnsTotal, durationPriceIdr, state.subscriptionYears]);
 
   const totalAfterPromoUsd = useMemo(() => {
     if (baseTotalUsd == null) return null;
