@@ -1,0 +1,253 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* EasyMarketingAssist Design System - Warm, Friendly, Approachable */
+
+@layer base {
+  :root {
+    /* Warm cream/ivory background */
+    --background: 40 33% 98%;
+    --foreground: 220 25% 20%;
+
+    /* Card surfaces with subtle warmth */
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 20%;
+
+    /* Brand red primary */
+    --primary: 0 51% 59%; /* #cc6060 */
+    --primary-foreground: 0 0% 100%;
+
+    /* Soft sage secondary */
+    --secondary: 160 25% 94%;
+    --secondary-foreground: 160 30% 30%;
+
+    /* Muted warm grays */
+    --muted: 40 20% 94%;
+    --muted-foreground: 220 15% 45%;
+
+    /* Teal accent for calls-to-action */
+    --accent: 174 60% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success */
+    --success: 142 70% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 40 20% 88%;
+    --input: 40 20% 88%;
+    --ring: 0 51% 59%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar - clean and professional */
+    --sidebar-background: 220 25% 18%;
+    --sidebar-foreground: 220 15% 90%;
+    --sidebar-primary: 0 51% 59%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 25% 25%;
+    --sidebar-accent-foreground: 220 15% 95%;
+    --sidebar-border: 220 25% 25%;
+    --sidebar-ring: 0 51% 59%;
+
+    /* Custom colors for EasyMarketingAssist */
+    --coral: 0 51% 59%;
+    --coral-light: 0 60% 70%;
+    --coral-dark: 0 45% 45%;
+    --teal: 174 60% 45%;
+    --teal-light: 174 60% 55%;
+    --cream: 40 33% 98%;
+    --sage: 160 25% 90%;
+    --navy: 220 25% 18%;
+  }
+
+  .dark {
+    --background: 220 25% 10%;
+    --foreground: 40 20% 95%;
+
+    --card: 220 25% 14%;
+    --card-foreground: 40 20% 95%;
+
+    --popover: 220 25% 14%;
+    --popover-foreground: 40 20% 95%;
+
+    --primary: 0 51% 59%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 25% 20%;
+    --secondary-foreground: 40 20% 95%;
+
+    --muted: 220 25% 18%;
+    --muted-foreground: 220 15% 65%;
+
+    --accent: 174 60% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 65% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 220 25% 22%;
+    --input: 220 25% 22%;
+    --ring: 0 51% 59%;
+
+    --sidebar-background: 220 30% 8%;
+    --sidebar-foreground: 220 15% 90%;
+    --sidebar-primary: 0 51% 59%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 25% 15%;
+    --sidebar-accent-foreground: 220 15% 95%;
+    --sidebar-border: 220 25% 15%;
+    --sidebar-ring: 0 51% 59%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  /* RichTextEditor content styles (Tailwind Typography plugin is not enabled) */
+  .rte-content {
+    @apply text-base leading-7 text-foreground;
+  }
+
+  .rte-content h1 {
+    @apply text-4xl leading-tight mt-8 mb-4 text-foreground;
+  }
+
+  .rte-content h2 {
+    @apply text-3xl leading-tight mt-8 mb-4 text-foreground;
+  }
+
+  .rte-content h3 {
+    @apply text-2xl leading-snug mt-6 mb-3 text-foreground;
+  }
+
+  .rte-content h4 {
+    @apply text-xl leading-snug mt-6 mb-2 text-foreground;
+  }
+
+  .rte-content h5 {
+    @apply text-lg leading-snug mt-5 mb-2 text-foreground;
+  }
+
+  .rte-content h6 {
+    @apply text-base leading-snug mt-4 mb-2 text-foreground;
+  }
+
+  .rte-content p {
+    @apply my-4;
+  }
+
+  .rte-content strong {
+    @apply font-semibold;
+  }
+
+  .rte-content ul {
+    @apply list-disc pl-6 my-4;
+  }
+
+  .rte-content ol {
+    @apply list-decimal pl-6 my-4;
+  }
+
+  .rte-content li {
+    @apply my-2;
+  }
+
+  .rte-content blockquote {
+    @apply border-l-4 border-border pl-4 italic text-muted-foreground my-6;
+  }
+
+  .rte-content hr {
+    @apply my-8 border-border;
+  }
+
+  .rte-content pre {
+    @apply rounded-md bg-muted p-4 overflow-x-auto my-6;
+  }
+
+  .rte-content img {
+    @apply max-w-full h-auto rounded-md my-6;
+  }
+
+  .rte-content a {
+    @apply underline underline-offset-4 text-primary;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbars while keeping scroll enabled (useful for mobile/tablet). */
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE/Edge legacy */
+    scrollbar-width: none; /* Firefox */
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+
+  /* Mobile: hide the browser scrollbar indicator globally (keep scrolling functional). */
+  @media (max-width: 768px) {
+    html,
+    body {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    html::-webkit-scrollbar,
+    body::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
+    }
+  }
+
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--coral-light)) 100%);
+  }
+
+  .gradient-accent {
+    background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(var(--teal-light)) 100%);
+  }
+
+  .gradient-hero {
+    background: linear-gradient(180deg, hsl(var(--cream)) 0%, hsl(var(--sage)) 100%);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .shadow-soft {
+    box-shadow: 0 4px 20px -4px hsla(var(--navy), 0.1);
+  }
+
+  .shadow-glow {
+    box-shadow: 0 0 30px -5px hsla(var(--primary), 0.3);
+  }
+}

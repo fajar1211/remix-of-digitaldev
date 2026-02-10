@@ -1,0 +1,58 @@
+// Country and city data
+export interface Country {
+  code: string;
+  name: string;
+  phoneCode: string;
+  cities: string[];
+}
+
+export const countries: Country[] = [
+  { code: 'US', name: 'United States', phoneCode: '+1', cities: ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia', 'San Antonio', 'San Diego', 'Dallas', 'San Jose'] },
+  { code: 'GB', name: 'United Kingdom', phoneCode: '+44', cities: ['London', 'Birmingham', 'Manchester', 'Glasgow', 'Liverpool', 'Leeds', 'Sheffield', 'Edinburgh', 'Bristol', 'Cardiff'] },
+  { code: 'CA', name: 'Canada', phoneCode: '+1', cities: ['Toronto', 'Montreal', 'Vancouver', 'Calgary', 'Edmonton', 'Ottawa', 'Winnipeg', 'Quebec City', 'Hamilton', 'Victoria'] },
+  { code: 'AU', name: 'Australia', phoneCode: '+61', cities: ['Sydney', 'Melbourne', 'Brisbane', 'Perth', 'Adelaide', 'Gold Coast', 'Canberra', 'Newcastle', 'Hobart', 'Darwin'] },
+  { code: 'DE', name: 'Germany', phoneCode: '+49', cities: ['Berlin', 'Munich', 'Frankfurt', 'Hamburg', 'Cologne', 'Stuttgart', 'Düsseldorf', 'Leipzig', 'Dresden', 'Hannover'] },
+  { code: 'FR', name: 'France', phoneCode: '+33', cities: ['Paris', 'Marseille', 'Lyon', 'Toulouse', 'Nice', 'Nantes', 'Strasbourg', 'Montpellier', 'Bordeaux', 'Lille'] },
+  { code: 'IT', name: 'Italy', phoneCode: '+39', cities: ['Rome', 'Milan', 'Naples', 'Turin', 'Palermo', 'Genoa', 'Bologna', 'Florence', 'Venice', 'Verona'] },
+  { code: 'ES', name: 'Spain', phoneCode: '+34', cities: ['Madrid', 'Barcelona', 'Valencia', 'Seville', 'Zaragoza', 'Málaga', 'Murcia', 'Palma', 'Bilbao', 'Alicante'] },
+  { code: 'NL', name: 'Netherlands', phoneCode: '+31', cities: ['Amsterdam', 'Rotterdam', 'The Hague', 'Utrecht', 'Eindhoven', 'Tilburg', 'Groningen', 'Almere', 'Breda', 'Nijmegen'] },
+  { code: 'BE', name: 'Belgium', phoneCode: '+32', cities: ['Brussels', 'Antwerp', 'Ghent', 'Charleroi', 'Liège', 'Bruges', 'Namur', 'Leuven', 'Mons', 'Mechelen'] },
+  { code: 'JP', name: 'Japan', phoneCode: '+81', cities: ['Tokyo', 'Osaka', 'Yokohama', 'Nagoya', 'Sapporo', 'Fukuoka', 'Kobe', 'Kyoto', 'Kawasaki', 'Saitama'] },
+  { code: 'KR', name: 'South Korea', phoneCode: '+82', cities: ['Seoul', 'Busan', 'Incheon', 'Daegu', 'Daejeon', 'Gwangju', 'Suwon', 'Ulsan', 'Changwon', 'Seongnam'] },
+  { code: 'CN', name: 'China', phoneCode: '+86', cities: ['Shanghai', 'Beijing', 'Guangzhou', 'Shenzhen', 'Chengdu', 'Hangzhou', 'Wuhan', 'Xian', 'Suzhou', 'Nanjing'] },
+  { code: 'IN', name: 'India', phoneCode: '+91', cities: ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad', 'Jaipur', 'Surat'] },
+  { code: 'SG', name: 'Singapore', phoneCode: '+65', cities: ['Singapore'] },
+  { code: 'MY', name: 'Malaysia', phoneCode: '+60', cities: ['Kuala Lumpur', 'George Town', 'Johor Bahru', 'Ipoh', 'Shah Alam', 'Petaling Jaya', 'Kuching', 'Kota Kinabalu', 'Melaka', 'Alor Setar'] },
+  { code: 'ID', name: 'Indonesia', phoneCode: '+62', cities: ['Jakarta', 'Surabaya', 'Bandung', 'Medan', 'Semarang', 'Makassar', 'Palembang', 'Depok', 'Tangerang', 'Bekasi'] },
+  { code: 'TH', name: 'Thailand', phoneCode: '+66', cities: ['Bangkok', 'Chiang Mai', 'Pattaya', 'Phuket', 'Hat Yai', 'Nakhon Ratchasima', 'Khon Kaen', 'Udon Thani', 'Chiang Rai', 'Surat Thani'] },
+  { code: 'VN', name: 'Vietnam', phoneCode: '+84', cities: ['Ho Chi Minh City', 'Hanoi', 'Da Nang', 'Hai Phong', 'Can Tho', 'Nha Trang', 'Hue', 'Vung Tau', 'Bien Hoa', 'Quy Nhon'] },
+  { code: 'PH', name: 'Philippines', phoneCode: '+63', cities: ['Manila', 'Quezon City', 'Davao', 'Cebu City', 'Zamboanga', 'Antipolo', 'Pasig', 'Taguig', 'Cagayan de Oro', 'Parañaque'] },
+  { code: 'BR', name: 'Brazil', phoneCode: '+55', cities: ['São Paulo', 'Rio de Janeiro', 'Brasília', 'Salvador', 'Fortaleza', 'Belo Horizonte', 'Manaus', 'Curitiba', 'Recife', 'Porto Alegre'] },
+  { code: 'MX', name: 'Mexico', phoneCode: '+52', cities: ['Mexico City', 'Guadalajara', 'Monterrey', 'Puebla', 'Tijuana', 'León', 'Juárez', 'Zapopan', 'Mérida', 'Cancún'] },
+  { code: 'AR', name: 'Argentina', phoneCode: '+54', cities: ['Buenos Aires', 'Córdoba', 'Rosario', 'Mendoza', 'San Miguel de Tucumán', 'La Plata', 'Mar del Plata', 'Salta', 'Santa Fe', 'Bahía Blanca'] },
+  { code: 'CL', name: 'Chile', phoneCode: '+56', cities: ['Santiago', 'Valparaíso', 'Concepción', 'La Serena', 'Antofagasta', 'Temuco', 'Rancagua', 'Talca', 'Arica', 'Chillán'] },
+  { code: 'CO', name: 'Colombia', phoneCode: '+57', cities: ['Bogotá', 'Medellín', 'Cali', 'Barranquilla', 'Cartagena', 'Cúcuta', 'Bucaramanga', 'Pereira', 'Santa Marta', 'Ibagué'] },
+  { code: 'ZA', name: 'South Africa', phoneCode: '+27', cities: ['Johannesburg', 'Cape Town', 'Durban', 'Pretoria', 'Port Elizabeth', 'Bloemfontein', 'East London', 'Nelspruit', 'Polokwane', 'Kimberley'] },
+  { code: 'NG', name: 'Nigeria', phoneCode: '+234', cities: ['Lagos', 'Kano', 'Ibadan', 'Abuja', 'Port Harcourt', 'Benin City', 'Kaduna', 'Maiduguri', 'Zaria', 'Jos'] },
+  { code: 'EG', name: 'Egypt', phoneCode: '+20', cities: ['Cairo', 'Alexandria', 'Giza', 'Shubra El Kheima', 'Port Said', 'Suez', 'Luxor', 'Aswan', 'Mansoura', 'El Mahalla El Kubra'] },
+  { code: 'AE', name: 'United Arab Emirates', phoneCode: '+971', cities: ['Dubai', 'Abu Dhabi', 'Sharjah', 'Al Ain', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'] },
+  { code: 'SA', name: 'Saudi Arabia', phoneCode: '+966', cities: ['Riyadh', 'Jeddah', 'Mecca', 'Medina', 'Dammam', 'Khobar', 'Tabuk', 'Taif', 'Buraidah', 'Khamis Mushait'] },
+  { code: 'TR', name: 'Turkey', phoneCode: '+90', cities: ['Istanbul', 'Ankara', 'Izmir', 'Bursa', 'Antalya', 'Adana', 'Konya', 'Gaziantep', 'Şanlıurfa', 'Mersin'] },
+  { code: 'RU', name: 'Russia', phoneCode: '+7', cities: ['Moscow', 'Saint Petersburg', 'Novosibirsk', 'Yekaterinburg', 'Kazan', 'Nizhny Novgorod', 'Chelyabinsk', 'Samara', 'Omsk', 'Rostov-on-Don'] },
+  { code: 'PL', name: 'Poland', phoneCode: '+48', cities: ['Warsaw', 'Kraków', 'Łódź', 'Wrocław', 'Poznań', 'Gdańsk', 'Szczecin', 'Bydgoszcz', 'Lublin', 'Białystok'] },
+  { code: 'SE', name: 'Sweden', phoneCode: '+46', cities: ['Stockholm', 'Gothenburg', 'Malmö', 'Uppsala', 'Västerås', 'Örebro', 'Linköping', 'Helsingborg', 'Jönköping', 'Norrköping'] },
+  { code: 'NO', name: 'Norway', phoneCode: '+47', cities: ['Oslo', 'Bergen', 'Trondheim', 'Stavanger', 'Drammen', 'Fredrikstad', 'Kristiansand', 'Sandnes', 'Tromsø', 'Sarpsborg'] },
+  { code: 'DK', name: 'Denmark', phoneCode: '+45', cities: ['Copenhagen', 'Aarhus', 'Odense', 'Aalborg', 'Frederiksberg', 'Esbjerg', 'Randers', 'Kolding', 'Horsens', 'Vejle'] },
+  { code: 'FI', name: 'Finland', phoneCode: '+358', cities: ['Helsinki', 'Espoo', 'Tampere', 'Vantaa', 'Oulu', 'Turku', 'Jyväskylä', 'Lahti', 'Kuopio', 'Pori'] },
+  { code: 'CH', name: 'Switzerland', phoneCode: '+41', cities: ['Zurich', 'Geneva', 'Basel', 'Lausanne', 'Bern', 'Winterthur', 'Lucerne', 'St. Gallen', 'Lugano', 'Biel'] },
+  { code: 'AT', name: 'Austria', phoneCode: '+43', cities: ['Vienna', 'Graz', 'Linz', 'Salzburg', 'Innsbruck', 'Klagenfurt', 'Villach', 'Wels', 'Sankt Pölten', 'Dornbirn'] },
+  { code: 'NZ', name: 'New Zealand', phoneCode: '+64', cities: ['Auckland', 'Wellington', 'Christchurch', 'Hamilton', 'Tauranga', 'Napier-Hastings', 'Dunedin', 'Palmerston North', 'Nelson', 'Rotorua'] },
+  { code: 'IE', name: 'Ireland', phoneCode: '+353', cities: ['Dublin', 'Cork', 'Limerick', 'Galway', 'Waterford', 'Drogheda', 'Dundalk', 'Swords', 'Bray', 'Navan'] },
+  { code: 'PT', name: 'Portugal', phoneCode: '+351', cities: ['Lisbon', 'Porto', 'Vila Nova de Gaia', 'Amadora', 'Braga', 'Setúbal', 'Coimbra', 'Funchal', 'Almada', 'Queluz'] },
+  { code: 'GR', name: 'Greece', phoneCode: '+30', cities: ['Athens', 'Thessaloniki', 'Patras', 'Heraklion', 'Larissa', 'Volos', 'Ioannina', 'Chania', 'Rhodes', 'Alexandroupoli'] },
+  { code: 'CZ', name: 'Czech Republic', phoneCode: '+420', cities: ['Prague', 'Brno', 'Ostrava', 'Plzeň', 'Liberec', 'Olomouc', 'České Budějovice', 'Hradec Králové', 'Pardubice', 'Ústí nad Labem'] },
+  { code: 'HU', name: 'Hungary', phoneCode: '+36', cities: ['Budapest', 'Debrecen', 'Szeged', 'Miskolc', 'Pécs', 'Győr', 'Nyíregyháza', 'Kecskemét', 'Székesfehérvár', 'Szombathely'] },
+  { code: 'IL', name: 'Israel', phoneCode: '+972', cities: ['Tel Aviv', 'Jerusalem', 'Haifa', 'Rishon LeZion', 'Petah Tikva', 'Ashdod', 'Netanya', 'Beersheba', 'Holon', 'Bnei Brak'] },
+  { code: 'HK', name: 'Hong Kong', phoneCode: '+852', cities: ['Hong Kong', 'Kowloon', 'Tsuen Wan', 'Yuen Long', 'Sha Tin', 'Tuen Mun', 'Tai Po', 'Sai Kung', 'Islands'] },
+  { code: 'TW', name: 'Taiwan', phoneCode: '+886', cities: ['Taipei', 'Kaohsiung', 'Taichung', 'Tainan', 'Taoyuan', 'Hsinchu', 'Keelung', 'Chiayi', 'Changhua', 'Pingtung'] },
+].sort((a, b) => a.name.localeCompare(b.name));
