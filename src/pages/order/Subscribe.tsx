@@ -123,13 +123,19 @@ export default function Subscribe() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-base font-semibold text-foreground">{finalLabel}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">All-in</p>
                           {isMonthly && monthlyBase != null && (opt as any)?.months ? (
-                            <p className="mt-2 text-xs text-muted-foreground">
-                              Otomatis dihitung: {formatIdr(monthlyBase)} / bulan × {(opt as any).months} bulan (12 × {opt.years} tahun)
-                              {(opt as any).discountPercent ? ` lalu diskon ${(opt as any).discountPercent}%` : ""}.
-                            </p>
-                          ) : null}
+                            <>
+                              {(opt as any).discountPercent > 0 ? (
+                                <Badge variant="secondary" className="mt-1">Diskon {(opt as any).discountPercent}%</Badge>
+                              ) : null}
+                              <p className="mt-2 text-xs text-muted-foreground">
+                                {formatIdr(monthlyBase)} / bulan × {(opt as any).months} bulan
+                                {(opt as any).discountPercent ? ` − diskon ${(opt as any).discountPercent}%` : ""}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="mt-1 text-sm text-muted-foreground">All-in</p>
+                          )}
                         </div>
                         {isSelected ? <Badge variant="secondary">Dipilih</Badge> : <Badge variant="outline">Plan</Badge>}
                       </div>
@@ -137,6 +143,11 @@ export default function Subscribe() {
                       <div className="mt-4">
                         <p className="text-2xl font-bold text-foreground">{opt.priceIdr > 0 ? formatIdr(opt.priceIdr) : "—"}</p>
                         <p className="mt-1 text-xs text-muted-foreground">Total untuk {opt.years} tahun</p>
+                        {isMonthly && monthlyBase != null && (opt as any)?.discountPercent > 0 ? (
+                          <p className="mt-1 text-xs text-primary font-medium">
+                            ≈ {formatIdr(Math.round(opt.priceIdr / ((opt as any).months || 1)))} / bulan
+                          </p>
+                        ) : null}
                       </div>
                     </button>
                   );

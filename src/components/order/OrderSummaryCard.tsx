@@ -142,9 +142,21 @@ export function OrderSummaryCard({
 
   const perMonthLabel = lang === "id" ? "Harga /Bulan" : "Price /Month";
   const totalLabel = lang === "id" ? "Total Harga" : "Total";
+
+  const selectedDiscountPercent = (() => {
+    if (!isMonthly || !state.subscriptionYears) return 0;
+    const months = Number(state.subscriptionYears) * 12;
+    return discountByMonths.get(months) ?? 0;
+  })();
+
   const perMonthValue = (() => {
     const v = Number(pricing?.packagePriceUsd ?? 0);
-    return Number.isFinite(v) && v > 0 ? formatIdr(v) : "—";
+    if (!Number.isFinite(v) || v <= 0) return "—";
+    if (isMonthly && selectedDiscountPercent > 0) {
+      const discounted = Math.round(v * (1 - selectedDiscountPercent / 100));
+      return formatIdr(discounted);
+    }
+    return formatIdr(v);
   })();
 
   if (variant === "compact") {
