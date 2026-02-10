@@ -167,7 +167,7 @@ export default function PackageCard({
   return (
     <Card
       className={cn(
-        'relative flex w-full max-w-sm flex-col overflow-hidden shadow-soft cursor-pointer transition-all duration-300 will-change-transform',
+        'relative flex w-full max-w-sm flex-col shadow-soft cursor-pointer transition-all duration-300 will-change-transform',
         'sm:basis-[calc(50%-1rem)] lg:basis-[calc(33.333%-1.34rem)]',
         isSelected
           ? 'border-primary/50 bg-primary/5 -translate-y-0.5 shadow-lg ring-2 ring-primary'
@@ -175,11 +175,11 @@ export default function PackageCard({
       )}
       onClick={() => onSelect(totalPrice, selectedAddOns)}
     >
-      {/* Top glow bar like /order/select-plan */}
+      {/* Top glow bar */}
       <div
         aria-hidden="true"
         className={cn(
-          'pointer-events-none absolute inset-x-0 top-0 h-1',
+          'pointer-events-none absolute inset-x-0 top-0 h-1 rounded-t-lg',
           isSelected ? 'bg-primary' : 'bg-muted',
         )}
       />
@@ -191,7 +191,7 @@ export default function PackageCard({
         />
       )}
       {hasBadges && (
-        <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2 pt-4 pb-0">
           {isBestSeller && (
             <Badge variant="secondary" className="gap-1 px-3 py-1 shadow-sm">
               <Award className="h-3.5 w-3.5" />
