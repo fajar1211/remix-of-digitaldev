@@ -310,7 +310,7 @@ export default function Packages() {
           setDurationPlanYear1ByPackageId({});
         }
 
-        // Durations (fallback only, kept for safety)
+        // Durations — use MAX discount for "Diskon Hingga" display
         try {
           const pkgIds = withAddOns.map((p) => String(p.id));
           if (pkgIds.length) {
@@ -322,21 +322,13 @@ export default function Packages() {
               .order("sort_order", { ascending: true })
               .order("duration_months", { ascending: true });
 
-            const yearsWantedById: Record<string, number> = {};
-            for (const p of withAddOns) {
-              const n = String(p.name ?? "").trim().toLowerCase();
-              const t = String(p.type ?? "").trim().toLowerCase();
-              const isMarketing3y = n === "growth" || t === "growth" || n === "pro" || t === "pro";
-              yearsWantedById[String(p.id)] = isMarketing3y ? 3 : 1;
-            }
-
             const map: Record<string, number> = {};
             if (Array.isArray(durationsData)) {
               for (const row of durationsData as any as PackageDurationRow[]) {
                 const pid = String(row.package_id);
-                const wantedMonths = Math.max(12, Number(yearsWantedById[pid] ?? 1) * 12);
-                if (Number(row.duration_months) === wantedMonths && Number.isFinite(Number(row.discount_percent))) {
-                  map[pid] = Number(row.discount_percent);
+                const disc = Number(row.discount_percent);
+                if (Number.isFinite(disc)) {
+                  map[pid] = Math.max(map[pid] ?? 0, disc);
                 }
               }
             }
