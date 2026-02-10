@@ -47,6 +47,7 @@ export default function SelectPlan() {
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<PackageRow[]>([]);
+  const [maxDiscountByPkgId, setMaxDiscountByPkgId] = useState<Record<string, number>>({});
 
   const preselectId = (query.get("packageId") ?? "").trim();
 
@@ -75,13 +76,36 @@ export default function SelectPlan() {
         if (!mounted) return;
         setRows(filtered);
 
+        // Fetch max discount from package_durations
+        const pkgIds = filtered.map((p) => p.id);
+        if (pkgIds.length) {
+          const { data: durData } = await supabase
+            .from("package_durations")
+            .select("package_id,discount_percent")
+            .in("package_id", pkgIds)
+            .eq("is_active", true);
+
+          if (mounted && Array.isArray(durData)) {
+            const discMap: Record<string, number> = {};
+            for (const r of durData as any[]) {
+              const pid = String(r.package_id);
+              const d = Number(r.discount_percent);
+              if (Number.isFinite(d)) discMap[pid] = Math.max(discMap[pid] ?? 0, d);
+            }
+            setMaxDiscountByPkgId(discMap);
+          }
+        }
+
         // If coming from /packages card click, preselect without forcing navigation.
         if (preselectId && !state.selectedPackageId && filtered.some((p) => p.id === preselectId)) {
           const p = filtered.find((x) => x.id === preselectId) as PackageRow;
           setPackage({ id: p.id, name: p.name });
         }
       } catch {
-        if (mounted) setRows([]);
+        if (mounted) {
+          setRows([]);
+          setMaxDiscountByPkgId({});
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -165,8 +189,28 @@ export default function SelectPlan() {
                       </div>
 
                       <div className="mt-4">
-                        <p className="text-3xl font-bold text-foreground">{formatIdr(price)}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">Harga dasar (belum termasuk durasi).</p>
+                        {(() => {
+                          const disc = maxDiscountByPkgId[pkg.id] ?? 0;
+                          const discounted = disc > 0 ? Math.round(price * (1 - disc / 100)) : price;
+                          return disc > 0 ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-primary">Diskon Hingga</span>
+                                <span className="text-2xl font-extrabold text-primary">{Math.round(disc)}%</span>
+                              </div>
+                              <p className="text-sm text-muted-foreground line-through">
+                                Harga Normal / Bulan: {formatIdr(price)}
+                              </p>
+                              <p className="text-3xl font-bold text-foreground">{formatIdr(discounted)}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">Harga setelah diskon / bulan</p>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-3xl font-bold text-foreground">{formatIdr(price)}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">Harga dasar (belum termasuk durasi).</p>
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {pkg.description ? (
