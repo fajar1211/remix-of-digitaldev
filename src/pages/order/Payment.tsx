@@ -423,7 +423,7 @@ export default function Payment() {
         ) : null}
 
 
-        {gateway === "xendit" ? (
+        {gateway === "xendit" || gateway == null ? (
           <XenditPaymentMethodCard
             title={t("order.paymentMethod")}
             promo={promo}
@@ -648,7 +648,7 @@ export default function Payment() {
           <Button type="button" variant="outline" onClick={() => navigate("/order/subscription")}>
             {t("common.back")}
           </Button>
-          {method === "card" ? (
+          {method === "card" || gateway === "xendit" || gateway == null ? (
             <PaymentConfirmDialog
               open={confirmOpen}
               onOpenChange={(o) => {
@@ -657,22 +657,21 @@ export default function Payment() {
               }}
               confirming={paying}
               disabled={
-                gateway == null ||
                 paying ||
-                totalAfterPromoUsd == null ||
+                totalAfterPromoIdr == null ||
                 (gateway === "midtrans" ? !midtrans.ready || !isCardFormValid : false)
               }
               amountUsdFormatted={totalAfterPromoIdr == null ? "—" : formatIdr(totalAfterPromoIdr)}
-              triggerText={gateway === "xendit" ? t("order.payWithXendit") : t("order.payWithCard")}
-              confirmText={gateway === "xendit" ? t("order.confirmContinue") : t("order.confirmAndPay")}
-              note={gateway === "xendit" ? t("order.redirectXendit") : t("order.midtransIdrNote")}
+              triggerText={gateway === "xendit" || gateway == null ? t("order.payWithXendit") : t("order.payWithCard")}
+              confirmText={gateway === "xendit" || gateway == null ? t("order.confirmContinue") : t("order.confirmAndPay")}
+              note={gateway === "xendit" || gateway == null ? t("order.redirectXendit") : t("order.midtransIdrNote")}
               onConfirm={async () => {
                 if (!canComplete) {
                   toast({ variant: "destructive", title: t("order.completeOrderTitle"), description: t("order.completeOrderBody") });
                   setConfirmOpen(false);
                   return;
                 }
-                if (gateway === "xendit") return await startXenditInvoice();
+                if (gateway === "xendit" || gateway == null) return await startXenditInvoice();
                 return await startCardPayment();
               }}
             />
