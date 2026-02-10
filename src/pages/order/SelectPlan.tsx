@@ -40,7 +40,6 @@ function formatIdr(value: number) {
   return `Rp ${Math.round(value).toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
 }
 
-// Build v2 – discount sync + subscribe page
 export default function SelectPlan() {
   const navigate = useNavigate();
   const query = useQuery();
@@ -57,14 +56,15 @@ export default function SelectPlan() {
     (async () => {
       setLoading(true);
       try {
+        // Fetch packages WITH their durations in a single query to avoid silent failures
         const { data, error } = await supabase
           .from("packages")
-          .select("id,name,type,description,price,features,is_active,show_on_public")
+          .select("id,name,type,description,price,features,is_active,show_on_public,package_durations(package_id,discount_percent,is_active)")
           .eq("is_active", true)
           .eq("show_on_public", true);
 
         if (error) throw error;
-        const all = (data ?? []) as PackageRow[];
+        const all = (data ?? []) as (PackageRow & { package_durations?: Array<{ package_id: string; discount_percent: number; is_active: boolean }> })[];
         const filtered = all.filter(isGrowthOrPro).sort((a, b) => {
           const an = (a.name ?? "").toLowerCase();
           const bn = (b.name ?? "").toLowerCase();
@@ -77,32 +77,27 @@ export default function SelectPlan() {
         if (!mounted) return;
         setRows(filtered);
 
-        // Fetch max discount from package_durations
-        const pkgIds = filtered.map((p) => p.id);
-        if (pkgIds.length) {
-          const { data: durData } = await supabase
-            .from("package_durations")
-            .select("package_id,discount_percent")
-            .in("package_id", pkgIds)
-            .eq("is_active", true);
-
-          if (mounted && Array.isArray(durData)) {
-            const discMap: Record<string, number> = {};
-            for (const r of durData as any[]) {
-              const pid = String(r.package_id);
-              const d = Number(r.discount_percent);
-              if (Number.isFinite(d)) discMap[pid] = Math.max(discMap[pid] ?? 0, d);
+        // Extract max discount from the nested package_durations data
+        const discMap: Record<string, number> = {};
+        for (const pkg of filtered) {
+          const durations = pkg.package_durations ?? [];
+          for (const dur of durations) {
+            if (dur.is_active === false) continue;
+            const d = Number(dur.discount_percent);
+            if (Number.isFinite(d)) {
+              discMap[pkg.id] = Math.max(discMap[pkg.id] ?? 0, d);
             }
-            setMaxDiscountByPkgId(discMap);
           }
         }
+        setMaxDiscountByPkgId(discMap);
 
         // If coming from /packages card click, preselect without forcing navigation.
         if (preselectId && !state.selectedPackageId && filtered.some((p) => p.id === preselectId)) {
           const p = filtered.find((x) => x.id === preselectId) as PackageRow;
           setPackage({ id: p.id, name: p.name });
         }
-      } catch {
+      } catch (e) {
+        console.error("[SelectPlan] fetch error:", e);
         if (mounted) {
           setRows([]);
           setMaxDiscountByPkgId({});

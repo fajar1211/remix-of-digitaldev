@@ -149,11 +149,22 @@ export function OrderSummaryCard({
     return discountByMonths.get(months) ?? 0;
   })();
 
+  const maxDiscountPercent = (() => {
+    if (!isMonthly) return 0;
+    let max = 0;
+    for (const d of discountByMonths.values()) {
+      if (d > max) max = d;
+    }
+    return max;
+  })();
+
   const perMonthValue = (() => {
     const v = Number(pricing?.packagePriceUsd ?? 0);
     if (!Number.isFinite(v) || v <= 0) return "—";
-    if (isMonthly && selectedDiscountPercent > 0) {
-      const discounted = Math.round(v * (1 - selectedDiscountPercent / 100));
+    // If a duration is selected, use its discount; otherwise show max discount
+    const discountToShow = selectedDiscountPercent > 0 ? selectedDiscountPercent : maxDiscountPercent;
+    if (isMonthly && discountToShow > 0) {
+      const discounted = Math.round(v * (1 - discountToShow / 100));
       return formatIdr(discounted);
     }
     return formatIdr(v);
