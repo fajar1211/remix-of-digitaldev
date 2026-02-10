@@ -226,7 +226,7 @@ export default function Billing() {
               setConfirmOpen(o);
             }}
             confirming={paying}
-            disabled={paying || totalAfterPromoIdr == null}
+            disabled={paying}
             amountUsdFormatted={totalAfterPromoIdr == null ? "—" : formatIdr(totalAfterPromoIdr)}
             triggerText={t("order.payWithXendit")}
             confirmText={t("order.confirmContinue")}

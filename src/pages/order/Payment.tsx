@@ -658,7 +658,6 @@ export default function Payment() {
               confirming={paying}
               disabled={
                 paying ||
-                totalAfterPromoIdr == null ||
                 (gateway === "midtrans" ? !midtrans.ready || !isCardFormValid : false)
               }
               amountUsdFormatted={totalAfterPromoIdr == null ? "—" : formatIdr(totalAfterPromoIdr)}
