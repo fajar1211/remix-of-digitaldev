@@ -206,9 +206,49 @@ export default function Billing() {
             <div className="rounded-lg border p-4">
               <p className="font-medium text-foreground">{t("order.priceBreakdown")}</p>
               <dl className="mt-3 grid gap-2">
-                <div className="flex items-center justify-between gap-4">
-                  <dt className="text-muted-foreground">{t("order.amount")}</dt>
-                  <dd className="font-medium text-foreground">{totalAfterPromoIdr == null ? "—" : formatIdr(totalAfterPromoIdr)}</dd>
+                {state.selectedPackageName && (
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Paket ({state.selectedPackageName})</dt>
+                    <dd className="text-foreground">{pricing.packagePriceUsd != null ? formatIdr(pricing.packagePriceUsd) + "/bln" : "—"}</dd>
+                  </div>
+                )}
+                {pricing.domainPriceUsd != null && pricing.domainPriceUsd > 0 && (
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Domain ({state.domain || "—"})</dt>
+                    <dd className="text-foreground">{formatIdr(pricing.domainPriceUsd)}/bln</dd>
+                  </div>
+                )}
+                {state.subscriptionYears && (
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Durasi</dt>
+                    <dd className="text-foreground">{state.subscriptionYears * 12} bulan</dd>
+                  </div>
+                )}
+                {(() => {
+                  const months = state.subscriptionYears ? state.subscriptionYears * 12 : 0;
+                  const dp = discountByMonths.get(months) ?? 0;
+                  return dp > 0 ? (
+                    <div className="flex items-center justify-between gap-4">
+                      <dt className="text-muted-foreground">Diskon Durasi</dt>
+                      <dd className="text-green-600 font-medium">-{dp}%</dd>
+                    </div>
+                  ) : null;
+                })()}
+                {addOnsTotal > 0 && (
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Add-Ons</dt>
+                    <dd className="text-foreground">{formatIdr(addOnsTotal)}</dd>
+                  </div>
+                )}
+                {state.appliedPromo && (state.appliedPromo.discountUsd ?? 0) > 0 && (
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Promo ({state.appliedPromo.code})</dt>
+                    <dd className="text-green-600 font-medium">-{formatIdr(state.appliedPromo.discountUsd)}</dd>
+                  </div>
+                )}
+                <div className="border-t pt-2 mt-1 flex items-center justify-between gap-4">
+                  <dt className="font-semibold text-foreground">Total Harga</dt>
+                  <dd className="font-bold text-foreground text-base">{totalAfterPromoIdr == null ? "—" : formatIdr(totalAfterPromoIdr)}</dd>
                 </div>
               </dl>
             </div>
