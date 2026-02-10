@@ -40,6 +40,7 @@ function formatIdr(value: number) {
   return `Rp ${Math.round(value).toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
 }
 
+// Build v2 – discount sync + subscribe page
 export default function SelectPlan() {
   const navigate = useNavigate();
   const query = useQuery();
