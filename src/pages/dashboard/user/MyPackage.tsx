@@ -160,6 +160,8 @@ export default function MyPackage() {
   const [plansByPackageId, setPlansByPackageId] = useState<Record<string, SubscriptionPlanRow[]>>({});
   /** basePriceIdr from website_settings (order_subscription_plans) — synced with /packages page */
   const [basePriceByPackageId, setBasePriceByPackageId] = useState<Record<string, number>>({});
+  /** Discounted monthly price per package — mirrors /packages headline logic */
+  const [discountedMonthlyByPackageId, setDiscountedMonthlyByPackageId] = useState<Record<string, number>>({});
   const [savingDuration, setSavingDuration] = useState(false);
 
   // Upgrade form: chosen duration per upgrade package card
@@ -338,17 +340,28 @@ export default function MyPackage() {
 
         // Extract basePriceIdr for monthly display (synced with /packages page)
         const basePriceMap: Record<string, number> = {};
+        const discountedMap: Record<string, number> = {};
         for (const pid of pkgIds) {
           const plans = plansGrouped[pid];
           if (plans && plans.length > 0) {
-            // Use the base_price_idr from the first plan (year 1) as the monthly price
-            const year1 = plans.find((p) => p.years === 1) ?? plans[0];
-            if (year1 && year1.base_price_idr > 0) {
-              basePriceMap[pid] = year1.base_price_idr;
+            // Determine which plan year to use — mirrors /packages logic
+            const matchedPkg = mappedPkgs.find((p) => String(p.id) === pid);
+            const pName = (matchedPkg?.name ?? "").trim().toLowerCase();
+            const pType = (matchedPkg?.type ?? "").trim().toLowerCase();
+            const isMonthlyBase = pName === "growth" || pName === "pro" || pType === "growth" || pType === "pro";
+            const yearsWanted = isMonthlyBase ? 3 : 1;
+
+            const planRow = plans.find((p) => p.years === yearsWanted) ?? plans.find((p) => p.years === 1) ?? plans[0];
+            if (planRow && planRow.base_price_idr > 0) {
+              basePriceMap[pid] = planRow.base_price_idr;
+              // Compute discounted monthly price same as /packages headline
+              const disc = Number(planRow.discount_percent ?? 0);
+              discountedMap[pid] = Math.max(0, planRow.base_price_idr * (1 - disc / 100));
             }
           }
         }
         setBasePriceByPackageId(basePriceMap);
+        setDiscountedMonthlyByPackageId(discountedMap);
       }
 
       // Fetch add-ons for the current package + upgrade packages (Onboarding add-ons)
@@ -632,8 +645,9 @@ export default function MyPackage() {
   /** Resolved monthly price: prefer basePriceIdr from website_settings, fallback to packages.price */
   const resolvedMonthlyPrice = useMemo(() => {
     if (!activePackageId) return 0;
-    return basePriceByPackageId[activePackageId] ?? Number(activePackage?.packages.price || 0);
-  }, [activePackageId, basePriceByPackageId, activePackage?.packages.price]);
+    // Use discounted monthly price (synced with /packages headline), fallback to base, then packages.price
+    return discountedMonthlyByPackageId[activePackageId] ?? basePriceByPackageId[activePackageId] ?? Number(activePackage?.packages.price || 0);
+  }, [activePackageId, discountedMonthlyByPackageId, basePriceByPackageId, activePackage?.packages.price]);
 
   const currentMonthlyWithAddOns = useMemo(() => {
     return resolvedMonthlyPrice + currentAddOnsMonthly;
@@ -963,7 +977,7 @@ export default function MyPackage() {
                   return sum + qty * Number(addOn.price_per_unit ?? 0);
                 }, 0);
 
-                const upgradeMonthlyWithAddOns = (basePriceByPackageId[String(pkg.id)] ?? Number(pkg.price || 0)) + upgradeAddOnsMonthly;
+                const upgradeMonthlyWithAddOns = (discountedMonthlyByPackageId[String(pkg.id)] ?? basePriceByPackageId[String(pkg.id)] ?? Number(pkg.price || 0)) + upgradeAddOnsMonthly;
 
                 const discountedUpgradeTotal = computeDiscountedTotal({
                   monthlyPrice: upgradeMonthlyWithAddOns,
@@ -1008,7 +1022,7 @@ export default function MyPackage() {
                         </div>
 
                 <div className="text-right shrink-0">
-                          <div className="font-bold text-foreground text-xl leading-none">{formatIdr(basePriceByPackageId[String(pkg.id)] ?? pkg.price)}</div>
+                          <div className="font-bold text-foreground text-xl leading-none">{formatIdr(discountedMonthlyByPackageId[String(pkg.id)] ?? basePriceByPackageId[String(pkg.id)] ?? pkg.price)}</div>
                           <div className="text-xs text-muted-foreground">/bulan</div>
                         </div>
                       </div>
