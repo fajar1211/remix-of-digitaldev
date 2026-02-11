@@ -17,6 +17,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { usePackageDurations } from "@/hooks/usePackageDurations";
 import { computeDiscountedTotal } from "@/lib/packageDurations";
 import { createXenditInvoice } from "@/lib/orderPayments";
+import { supabase } from "@/integrations/supabase/client";
 
 function formatIdr(value: number) {
   return `Rp ${Math.round(value).toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
@@ -123,6 +124,48 @@ export default function Billing() {
     return Boolean(state.domain && state.selectedTemplateId && effectivePackageId && state.subscriptionYears && email && state.details.acceptedTerms);
   }, [effectivePackageId, state.details.acceptedTerms, state.details.email, state.domain, state.selectedTemplateId, state.subscriptionYears]);
 
+  const logOrderAudit = async () => {
+    try {
+      const sessionRes = await supabase.auth.getSession();
+      const userId = sessionRes.data.session?.user?.id ?? "anonymous";
+
+      await (supabase as any).from("super_admin_audit_logs").insert({
+        actor_user_id: userId,
+        provider: "order",
+        action: "order_billing_pay",
+        metadata: {
+          step_select_plan: {
+            package_id: state.selectedPackageId,
+            package_name: state.selectedPackageName,
+          },
+          step_checkout: {
+            name: state.details.name,
+            email: state.details.email,
+            phone: state.details.phone,
+            businessName: state.details.businessName,
+            provinceCode: state.details.provinceCode,
+            provinceName: state.details.provinceName,
+            city: state.details.city,
+          },
+          step_subscribe: {
+            subscription_years: state.subscriptionYears,
+            add_ons: state.addOns,
+            subscription_add_ons: state.subscriptionAddOns,
+          },
+          billing: {
+            domain: state.domain,
+            template_id: state.selectedTemplateId,
+            template_name: state.selectedTemplateName,
+            promo_code: state.promoCode,
+            amount_idr: totalAfterPromoIdr,
+          },
+        },
+      });
+    } catch (e) {
+      console.error("Audit log failed:", e);
+    }
+  };
+
   const startXenditInvoice = async () => {
     if (totalAfterPromoIdr == null) {
       toast({ variant: "destructive", title: t("order.totalNotAvailableTitle") });
@@ -131,6 +174,8 @@ export default function Billing() {
 
     setPaying(true);
     try {
+      await logOrderAudit();
+
       const res = await createXenditInvoice({
         amount_idr: totalAfterPromoIdr,
         subscription_years: state.subscriptionYears ?? 0,
@@ -202,11 +247,45 @@ export default function Billing() {
             <div className="rounded-lg border p-4">
               <p className="font-medium text-foreground">{t("order.priceBreakdown")}</p>
               <dl className="mt-3 grid gap-2">
-                <div className="flex items-center justify-between gap-4">
-                  <dt className="text-muted-foreground">{t("order.amount")}</dt>
-                  <dd className="font-medium text-foreground">{totalAfterPromoIdr == null ? "—" : formatIdr(totalAfterPromoIdr)}</dd>
-                </div>
+                {state.selectedPackageName ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Paket</dt>
+                    <dd className="font-medium text-foreground">{state.selectedPackageName}</dd>
+                  </div>
+                ) : null}
+                {state.subscriptionYears ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Durasi</dt>
+                    <dd className="font-medium text-foreground">{state.subscriptionYears} tahun</dd>
+                  </div>
+                ) : null}
+                {durationPriceIdr != null ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Harga Paket</dt>
+                    <dd className="font-medium text-foreground">{formatIdr(durationPriceIdr)}</dd>
+                  </div>
+                ) : null}
+                {addOnsTotal > 0 ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Add-ons</dt>
+                    <dd className="font-medium text-foreground">{formatIdr(addOnsTotal)}</dd>
+                  </div>
+                ) : null}
+                {state.appliedPromo ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Promo ({state.appliedPromo.code})</dt>
+                    <dd className="font-medium text-primary">-{formatIdr(state.appliedPromo.discountUsd)}</dd>
+                  </div>
+                ) : null}
               </dl>
+              <div className="mt-4 pt-3 border-t">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-base font-bold text-foreground">Total</span>
+                  <span className="text-xl font-bold text-foreground">
+                    {totalAfterPromoIdr == null ? "—" : formatIdr(totalAfterPromoIdr)}
+                  </span>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

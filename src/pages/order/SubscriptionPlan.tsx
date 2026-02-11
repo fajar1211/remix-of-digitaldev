@@ -21,9 +21,7 @@ export default function SubscriptionPlan() {
   const { t } = useI18n();
   const { state, setSubscriptionYears, setPackage } = useOrder();
 
-  // IMPORTANT: /order/subscription adalah flow paket Website Only /Tahun.
-  // Jangan biarkan selectedPackageId/name yang tersimpan dari flow lain (mis. paket bulanan) mempengaruhi summary.
-  const { subscriptionPlans, pricing } = useOrderPublicSettings(state.domain, null);
+  const { subscriptionPlans, pricing, durationRows } = useOrderPublicSettings(state.domain, null);
 
   useEffect(() => {
     if (!pricing.defaultPackageId) return;
@@ -34,6 +32,20 @@ export default function SubscriptionPlan() {
       name: pricing.packageName || "Website Only /Tahun",
     });
   }, [pricing.defaultPackageId, pricing.packageName, setPackage, state.selectedPackageId]);
+
+  // Build discount lookup from duration rows
+  const discountByYears = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const r of durationRows || []) {
+      if ((r as any)?.is_active === false) continue;
+      const months = Number((r as any)?.duration_months ?? 0);
+      const discount = Number((r as any)?.discount_percent ?? 0);
+      if (Number.isFinite(months) && months > 0 && months % 12 === 0) {
+        m.set(months / 12, discount);
+      }
+    }
+    return m;
+  }, [durationRows]);
 
   const options = useMemo(
     () =>
@@ -52,11 +64,12 @@ export default function SubscriptionPlan() {
             priceIdr,
             isActive,
             sortOrder,
+            discountPercent: discountByYears.get(years) ?? 0,
           };
         })
         .filter((opt) => opt.years > 0 && opt.isActive)
         .sort((a, b) => a.sortOrder - b.sortOrder),
-    [subscriptionPlans],
+    [subscriptionPlans, discountByYears],
   );
 
   const selected = state.subscriptionYears;
@@ -111,6 +124,9 @@ export default function SubscriptionPlan() {
                       <div className="mt-4">
                         <p className="text-2xl font-bold text-foreground">{opt.priceIdr > 0 ? formatIdr(opt.priceIdr) : "—"}</p>
                         <p className="mt-1 text-xs text-muted-foreground">{t("order.totalFor", { years: opt.years })}</p>
+                        {opt.discountPercent > 0 ? (
+                          <Badge variant="secondary" className="mt-2">Diskon {opt.discountPercent}%</Badge>
+                        ) : null}
                       </div>
                     </button>
                   );

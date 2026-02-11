@@ -1,12 +1,27 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, RefreshCcw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useMidtransPayments } from "./useMidtransPayments";
+import { supabase } from "@/integrations/supabase/client";
+
+type OrderItem = {
+  id: string;
+  created_at: string;
+  domain: string;
+  customer_name: string | null;
+  customer_email: string | null;
+  amount_idr: number | null;
+  amount_usd: number | null;
+  payment_provider: string | null;
+  payment_env: string | null;
+  status: string | null;
+  subscription_years: number | null;
+  promo_code: string | null;
+  midtrans_redirect_url: string | null;
+};
 
 function formatMoney(n: number | null | undefined, suffix: string) {
   if (n === null || n === undefined || !Number.isFinite(Number(n))) return "-";
@@ -22,38 +37,42 @@ function formatTime(v: unknown) {
 }
 
 export default function SuperAdminPayments() {
-  const { env, setEnv, loading, items, refresh } = useMidtransPayments();
+  const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState<OrderItem[]>([]);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from("orders")
+        .select("id,created_at,domain,customer_name,customer_email,amount_idr,amount_usd,payment_provider,payment_env,status,subscription_years,promo_code,midtrans_redirect_url")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setItems((data as OrderItem[]) ?? []);
+    } catch (e: any) {
+      console.error(e);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
-
-  useEffect(() => {
-    refresh({ env });
-  }, [env, refresh]);
 
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-3xl font-bold text-foreground">Payments</h1>
-          <p className="text-sm text-muted-foreground">Daftar transaksi Midtrans (real-time) berdasarkan environment yang dipilih.</p>
+          <p className="text-sm text-muted-foreground">Daftar transaksi order (semua payment provider).</p>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="w-[220px]">
-            <Select value={env} onValueChange={(v) => setEnv(v as any)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih environment" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sandbox">Sandbox</SelectItem>
-                <SelectItem value="production">Production</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Button variant="outline" onClick={() => refresh({ env })} disabled={loading}>
+          <Button variant="outline" onClick={refresh} disabled={loading}>
             <RefreshCcw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -69,82 +88,71 @@ export default function SuperAdminPayments() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Midtrans Order ID</TableHead>
+                <TableHead>Domain</TableHead>
                 <TableHead>Customer</TableHead>
+                <TableHead>Provider</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Amount</TableHead>
+                <TableHead>Durasi</TableHead>
                 <TableHead>Waktu</TableHead>
                 <TableHead className="text-right">Redirect</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((it) => {
-                const txStatus = String(it.midtrans?.transaction_status ?? "-");
-                const fraud = String(it.midtrans?.fraud_status ?? "-");
-                const time = (it.midtrans as any)?.transaction_time ?? (it.midtrans as any)?.settlement_time ?? null;
+              {items.map((it) => (
+                <TableRow key={it.id}>
+                  <TableCell className="font-medium">
+                    <span className="truncate">{it.domain ?? "-"}</span>
+                  </TableCell>
 
-                return (
-                  <TableRow key={it.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col">
-                        <span className="truncate">{it.midtrans_order_id ?? "-"}</span>
-                        <span className="text-xs text-muted-foreground truncate">{it.domain}</span>
-                      </div>
-                    </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="truncate">{it.customer_name ?? "-"}</span>
+                      <span className="text-xs text-muted-foreground truncate">{it.customer_email ?? "-"}</span>
+                    </div>
+                  </TableCell>
 
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="truncate">{it.customer_name ?? "-"}</span>
-                        <span className="text-xs text-muted-foreground truncate">{it.customer_email ?? "-"}</span>
-                      </div>
-                    </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{it.payment_provider ?? "-"}</Badge>
+                  </TableCell>
 
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary">{txStatus}</Badge>
-                          <span className="text-xs text-muted-foreground">fraud: {fraud}</span>
-                        </div>
-                        {it.midtrans_error ? <span className="text-xs text-destructive">{it.midtrans_error}</span> : null}
-                      </div>
-                    </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{it.status ?? "-"}</Badge>
+                  </TableCell>
 
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span>{formatMoney(it.amount_usd, "USD")}</span>
-                        <span className="text-xs text-muted-foreground">{formatMoney(it.amount_idr, "IDR")}</span>
-                      </div>
-                    </TableCell>
+                  <TableCell>
+                    <span>{formatMoney(it.amount_idr, "IDR")}</span>
+                  </TableCell>
 
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-xs text-muted-foreground">DB: {formatTime(it.created_at)}</span>
-                        <span className="text-xs">Midtrans: {formatTime(time)}</span>
-                      </div>
-                    </TableCell>
+                  <TableCell>
+                    <span className="text-sm">{it.subscription_years ? `${it.subscription_years} tahun` : "-"}</span>
+                  </TableCell>
 
-                    <TableCell className="text-right">
-                      {it.midtrans_redirect_url ? (
-                        <a
-                          href={it.midtrans_redirect_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-2 text-sm underline underline-offset-4"
-                        >
-                          Open <ExternalLink className="h-4 w-4" />
-                        </a>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+                  <TableCell>
+                    <span className="text-xs text-muted-foreground">{formatTime(it.created_at)}</span>
+                  </TableCell>
+
+                  <TableCell className="text-right">
+                    {it.midtrans_redirect_url ? (
+                      <a
+                        href={it.midtrans_redirect_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 text-sm underline underline-offset-4"
+                      >
+                        Open <ExternalLink className="h-4 w-4" />
+                      </a>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
 
               {!loading && items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                    Belum ada transaksi untuk environment ini.
+                  <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
+                    Belum ada transaksi.
                   </TableCell>
                 </TableRow>
               ) : null}

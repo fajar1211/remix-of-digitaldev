@@ -32,6 +32,7 @@ import SuperAdminPromotions from "./super-admin/Promotions";
 import SuperAdminSubscriptions from "./super-admin/Subscriptions";
 import SuperAdminMyAccount from "./super-admin/MyAccount";
 import SuperAdminPayments from "./super-admin/Payments";
+import SuperAdminAuditLogs from "./super-admin/AuditLogs";
 
 function LoadingScreen() {
   return (
@@ -56,7 +57,7 @@ export default function SuperAdminDashboard() {
       { title: "Duration Packages", url: "/dashboard/super-admin/duration-packages", icon: Activity },
       { title: "Payments", url: "/dashboard/super-admin/payments", icon: CreditCard },
       { title: "Promotions", url: "/dashboard/super-admin/promotions", icon: BadgePercent },
-      { title: "Audit Logs (soon)", url: "/dashboard/super-admin/audit-logs", icon: FileSearch },
+      { title: "Audit Logs", url: "/dashboard/super-admin/audit-logs", icon: FileSearch },
       { title: "Reports (soon)", url: "/dashboard/super-admin/reports", icon: BookOpen },
       { title: "Integrations", url: "/dashboard/super-admin/integrations", icon: BookOpen },
       { title: "System Settings (soon)", url: "/dashboard/super-admin/system-settings", icon: Settings },
@@ -149,7 +150,7 @@ export default function SuperAdminDashboard() {
 
               <Route path="promotions" element={<SuperAdminPromotions />} />
               <Route path="access-control" element={<SuperAdminAccessControl />} />
-              <Route path="audit-logs" element={<SuperAdminPlaceholder title="Audit Logs" />} />
+              <Route path="audit-logs" element={<SuperAdminAuditLogs />} />
               <Route path="system-settings" element={<SuperAdminPlaceholder title="System Settings" />} />
               <Route path="reports" element={<SuperAdminPlaceholder title="Reports" />} />
               <Route path="integrations" element={<SuperAdminCms />} />

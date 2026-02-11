@@ -315,7 +315,7 @@ export default function Auth() {
                 <RadioGroup
                   value={selectedRole}
                   onValueChange={(value) => setSelectedRole(value as AppRole)}
-                  className="grid grid-cols-2 gap-4"
+                  className={isLogin ? "grid grid-cols-2 gap-4" : "grid grid-cols-1 gap-4"}
                 >
                   <div>
                     <RadioGroupItem value="user" id="user" className="peer sr-only" />
@@ -328,17 +328,19 @@ export default function Auth() {
                       <span className="text-xs text-muted-foreground">{t("auth.client")}</span>
                     </Label>
                   </div>
-                  <div>
-                    <RadioGroupItem value="assist" id="assist" className="peer sr-only" />
-                    <Label
-                      htmlFor="assist"
-                      className="flex flex-col items-center justify-between rounded-lg border-2 border-muted bg-card p-4 hover:bg-muted/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
-                    >
-                      <UserCircle className="mb-2 h-6 w-6 text-accent" />
-                      <span className="text-sm font-medium">{t("auth.marketingAssist")}</span>
-                      <span className="text-xs text-muted-foreground">{t("auth.freelancer")}</span>
-                    </Label>
-                  </div>
+                  {isLogin && (
+                    <div>
+                      <RadioGroupItem value="assist" id="assist" className="peer sr-only" />
+                      <Label
+                        htmlFor="assist"
+                        className="flex flex-col items-center justify-between rounded-lg border-2 border-muted bg-card p-4 hover:bg-muted/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
+                      >
+                        <UserCircle className="mb-2 h-6 w-6 text-accent" />
+                        <span className="text-sm font-medium">{t("auth.marketingAssist")}</span>
+                        <span className="text-xs text-muted-foreground">{t("auth.freelancer")}</span>
+                      </Label>
+                    </div>
+                  )}
                 </RadioGroup>
               </div>
 

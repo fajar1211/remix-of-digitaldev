@@ -631,13 +631,27 @@ export default function Payment() {
             <div className="rounded-lg border p-4">
               <p className="font-medium text-foreground">{t("order.priceBreakdown")}</p>
               <dl className="mt-3 grid gap-2">
-                <div className="flex items-center justify-between gap-4">
-                  <dt className="text-muted-foreground">{t("order.amount")}</dt>
-                  <dd className="font-medium text-foreground">
-                    {totalAfterPromoIdr == null ? "—" : formatIdr(totalAfterPromoIdr)}
-                  </dd>
-                </div>
+                {state.subscriptionYears ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Durasi</dt>
+                    <dd className="font-medium text-foreground">{state.subscriptionYears} tahun</dd>
+                  </div>
+                ) : null}
+                {state.appliedPromo ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-muted-foreground">Promo ({state.appliedPromo.code})</dt>
+                    <dd className="font-medium text-primary">-{formatIdr(state.appliedPromo.discountUsd)}</dd>
+                  </div>
+                ) : null}
               </dl>
+              <div className="mt-4 pt-3 border-t">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-base font-bold text-foreground">Total</span>
+                  <span className="text-xl font-bold text-foreground">
+                    {totalAfterPromoIdr == null ? "—" : formatIdr(totalAfterPromoIdr)}
+                  </span>
+                </div>
+              </div>
             </div>
 
             <p className="text-muted-foreground">{t("order.reviewNote")}</p>
