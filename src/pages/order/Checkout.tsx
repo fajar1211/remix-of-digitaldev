@@ -16,7 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useOrder } from "@/contexts/OrderContext";
 
 const schema = z.object({
-  name: z.string().trim().min(1, "Nama lengkap wajib diisi").max(100),
+  firstName: z.string().trim().min(1, "Nama depan wajib diisi").max(50),
+  lastName: z.string().trim().min(1, "Nama belakang wajib diisi").max(50),
   email: z.string().trim().email("Email tidak valid").max(255),
   phone: z.string().trim().min(6, "Nomor Telp/WhatsApp wajib diisi").max(30, "Nomor Telp/WhatsApp terlalu panjang"),
   businessName: z.string().trim().max(120).optional().or(z.literal("")),
@@ -53,9 +54,11 @@ export default function Checkout() {
     return [...list].sort((a, b) => String(a.name).localeCompare(String(b.name), "id"));
   }, []);
 
+  const nameParts = (state.details.name ?? "").trim().split(/\s+/);
   const defaultValues = useMemo<FormValues>(
     () => ({
-      name: state.details.name,
+      firstName: nameParts[0] ?? "",
+      lastName: nameParts.slice(1).join(" ") ?? "",
       email: state.details.email,
       phone: state.details.phone,
       businessName: state.details.businessName ?? "",
@@ -175,25 +178,42 @@ export default function Checkout() {
               className="space-y-5"
               onSubmit={form.handleSubmit((values) => {
                 const provinceName = provinces.find((p) => p.isoCode === values.provinceCode)?.name ?? "";
-                setDetails({ ...values, provinceName });
+                const fullName = `${values.firstName} ${values.lastName}`.trim();
+                setDetails({ ...values, name: fullName, provinceName });
                 navigate("/order/subscribe");
               })}
             >
               <div className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
-                  name="name"
+                  name="firstName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nama</FormLabel>
+                      <FormLabel>Nama Depan</FormLabel>
                       <FormControl>
-                        <Input {...field} autoComplete="name" />
+                        <Input {...field} autoComplete="given-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
+                <FormField
+                  control={form.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nama Belakang</FormLabel>
+                      <FormControl>
+                        <Input {...field} autoComplete="family-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="email"
@@ -207,9 +227,6 @@ export default function Checkout() {
                     </FormItem>
                   )}
                 />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="phone"
