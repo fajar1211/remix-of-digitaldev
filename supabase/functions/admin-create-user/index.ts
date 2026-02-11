@@ -1,6 +1,6 @@
 // Supabase Edge Function: admin-create-user
 // Creates a new auth user without email confirmation, assigns role=user, and seeds businesses/profile.
-// Now also supports province, city, packageId, durationMonths from admin form.
+// Supports firstName, lastName, province, city, packageId, durationMonths from admin form.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -13,6 +13,8 @@ const corsHeaders: Record<string, string> = {
 type Payload = {
   email: string;
   password: string;
+  firstName?: string;
+  lastName?: string;
   fullName?: string;
   businessName?: string;
   phone?: string;
@@ -92,7 +94,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const fullName = (body.fullName ?? "").trim();
+    const firstName = (body.firstName ?? "").trim();
+    const lastName = (body.lastName ?? "").trim();
+    const fullName = (body.fullName ?? "").trim() || `${firstName} ${lastName}`.trim();
 
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email,
@@ -100,6 +104,8 @@ Deno.serve(async (req) => {
       email_confirm: true,
       user_metadata: {
         name: fullName || email,
+        firstName,
+        lastName,
         role: "user",
       },
     });
@@ -115,6 +121,8 @@ Deno.serve(async (req) => {
 
     await admin.from("businesses").insert({
       user_id: newUser.id,
+      first_name: firstName || null,
+      last_name: lastName || null,
       business_name: businessName || null,
       email: email,
       phone_number: (body.phone ?? "").trim() || null,

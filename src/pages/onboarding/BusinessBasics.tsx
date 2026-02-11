@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { businessTypeCategories } from '@/data/businessTypes';
-import { findCountryByName, findStateByName, getAllCountries, getCitiesOfState, getStatesOfCountry } from '@/lib/locations';
+import { findCountryByName, findStateByName, getAllCountries, getStatesOfCountry } from '@/lib/locations';
+import { getIndonesianCities, fetchIndonesianCitiesFromApi } from '@/lib/indonesiaCities';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -57,17 +58,51 @@ export default function BusinessBasics() {
       phoneNumber = phoneStored;
     }
 
-    setFormData((prev) => ({
-      ...prev,
-      businessName,
-      businessType,
-      country,
-      state,
-      city,
-      phoneCode: phoneCode || prev.phoneCode,
-      phoneNumber,
-    }));
-  }, []);
+    if (businessName || businessType || country || state || city || phoneNumber) {
+      setFormData((prev) => ({
+        ...prev,
+        businessName,
+        businessType,
+        country,
+        state,
+        city,
+        phoneCode: phoneCode || prev.phoneCode,
+        phoneNumber,
+      }));
+      return;
+    }
+
+    // Prefill from DB (admin-created user)
+    if (!user) return;
+    const prefillFromDb = async () => {
+      const { data } = await (supabase as any)
+        .from('businesses')
+        .select('business_name, business_type, country, state, city, phone_number')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!data) return;
+
+      let dbPhoneCode = '';
+      let dbPhoneNumber = data.phone_number ?? '';
+      const pm = dbPhoneNumber.match(/^(\+\d+)\s*(.*)$/);
+      if (pm) {
+        dbPhoneCode = pm[1] ?? '';
+        dbPhoneNumber = (pm[2] ?? '').trim();
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        businessName: data.business_name ?? prev.businessName,
+        businessType: data.business_type ?? prev.businessType,
+        country: data.country ?? prev.country,
+        state: data.state ?? prev.state,
+        city: data.city ?? prev.city,
+        phoneCode: dbPhoneCode || prev.phoneCode,
+        phoneNumber: dbPhoneNumber || prev.phoneNumber,
+      }));
+    };
+    void prefillFromDb();
+  }, [user]);
 
   useEffect(() => {
     if (formData.country) {
@@ -98,8 +133,24 @@ export default function BusinessBasics() {
       return;
     }
     const st = findStateByName(country.isoCode, formData.state);
-    const cities = st ? getCitiesOfState(country.isoCode, st.isoCode).map((c) => c.name) : [];
-    setAvailableCities(cities);
+    if (!st) {
+      setAvailableCities([]);
+      return;
+    }
+
+    // Use enhanced fallback (same as /order/checkout)
+    const libCities = getIndonesianCities(st.isoCode, st.name);
+    if (libCities.length > 0) {
+      setAvailableCities(libCities);
+      return;
+    }
+
+    // API fallback
+    const controller = new AbortController();
+    fetchIndonesianCitiesFromApi(st.name, controller.signal).then((cities) => {
+      setAvailableCities(cities);
+    });
+    return () => controller.abort();
   }, [formData.country, formData.state]);
 
   const isFormValid = 

@@ -6,9 +6,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BrandHeader } from '@/components/layout/BrandHeader';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function GetStarted() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -17,14 +20,36 @@ export default function GetStarted() {
   const [isPrefilled, setIsPrefilled] = useState(false);
 
   useEffect(() => {
+    // First try sessionStorage
     const first = sessionStorage.getItem('onboarding_firstName') ?? '';
     const last = sessionStorage.getItem('onboarding_lastName') ?? '';
 
     if (first.trim() || last.trim()) {
       setFormData({ firstName: first, lastName: last });
       setIsPrefilled(true);
+      return;
     }
-  }, []);
+
+    // Then try DB (admin may have pre-filled via admin-create-user)
+    if (!user) return;
+    const prefill = async () => {
+      const { data } = await (supabase as any)
+        .from('businesses')
+        .select('first_name, last_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (data && (data.first_name || data.last_name)) {
+        const fn = data.first_name ?? '';
+        const ln = data.last_name ?? '';
+        setFormData({ firstName: fn, lastName: ln });
+        setIsPrefilled(true);
+        sessionStorage.setItem('onboarding_firstName', fn);
+        sessionStorage.setItem('onboarding_lastName', ln);
+      }
+    };
+    void prefill();
+  }, [user]);
 
   const isFormValid = formData.firstName.trim() && formData.lastName.trim();
 

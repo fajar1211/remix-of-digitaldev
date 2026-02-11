@@ -17,11 +17,10 @@ import {
 } from "@/components/ui/select";
 import { invokeWithAuth } from "@/lib/invokeWithAuth";
 import {
-  findCountryByName,
-  getStatesOfCountry,
-  getCitiesOfState,
   findStateByName,
+  getStatesOfCountry,
 } from "@/lib/locations";
+import { getIndonesianCities, fetchIndonesianCitiesFromApi } from "@/lib/indonesiaCities";
 
 type PackageRow = {
   id: string;
@@ -46,8 +45,9 @@ export default function AdminCreateBusinessUser() {
   const [form, setForm] = useState({
     email: "",
     password: "",
-    fullName: "",
-    whatsapp: "",
+    firstName: "",
+    lastName: "",
+    phone: "",
     businessName: "",
     province: "",
     city: "",
@@ -67,13 +67,28 @@ export default function AdminCreateBusinessUser() {
     [form.province]
   );
 
-  const cities = useMemo(
+  // Cities with fallback (like /order/checkout)
+  const libraryCities = useMemo(
     () =>
       selectedProvince
-        ? getCitiesOfState(indonesiaIso, selectedProvince.isoCode).map((c) => c.name)
+        ? getIndonesianCities(selectedProvince.isoCode, selectedProvince.name)
         : [],
     [selectedProvince]
   );
+
+  const [apiCities, setApiCities] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!selectedProvince || libraryCities.length > 0) {
+      setApiCities([]);
+      return;
+    }
+    const controller = new AbortController();
+    fetchIndonesianCitiesFromApi(selectedProvince.name, controller.signal).then(setApiCities);
+    return () => controller.abort();
+  }, [selectedProvince, libraryCities.length]);
+
+  const cities = libraryCities.length > 0 ? libraryCities : apiCities;
 
   // Load packages and durations
   useEffect(() => {
@@ -97,9 +112,7 @@ export default function AdminCreateBusinessUser() {
   const updateField = (key: string, value: string) => {
     setForm((p) => {
       const next = { ...p, [key]: value };
-      // Reset city when province changes
       if (key === "province") next.city = "";
-      // Reset duration when package changes
       if (key === "packageId") next.durationMonths = "";
       return next;
     });
@@ -117,8 +130,12 @@ export default function AdminCreateBusinessUser() {
       toast({ variant: "destructive", title: "Password minimal 6 karakter" });
       return;
     }
-    if (!form.fullName.trim()) {
-      toast({ variant: "destructive", title: "Nama wajib diisi" });
+    if (!form.firstName.trim()) {
+      toast({ variant: "destructive", title: "First Name wajib diisi" });
+      return;
+    }
+    if (!form.lastName.trim()) {
+      toast({ variant: "destructive", title: "Last Name wajib diisi" });
       return;
     }
     if (!form.province) {
@@ -143,9 +160,11 @@ export default function AdminCreateBusinessUser() {
       const { data, error } = await invokeWithAuth("admin-create-user", {
         email,
         password,
-        fullName: form.fullName.trim(),
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        fullName: `${form.firstName.trim()} ${form.lastName.trim()}`,
         businessName: form.businessName.trim(),
-        phone: form.whatsapp.trim(),
+        phone: form.phone.trim(),
         province: form.province,
         city: form.city,
         packageId: form.packageId,
@@ -247,20 +266,29 @@ export default function AdminCreateBusinessUser() {
         </CardHeader>
         <CardContent className="grid gap-6 md:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="fullName">Nama <span className="text-destructive">*</span></Label>
+            <Label htmlFor="firstName">First Name <span className="text-destructive">*</span></Label>
             <Input
-              id="fullName"
-              value={form.fullName}
-              onChange={(e) => updateField("fullName", e.target.value)}
-              placeholder="Nama lengkap"
+              id="firstName"
+              value={form.firstName}
+              onChange={(e) => updateField("firstName", e.target.value)}
+              placeholder="John"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="whatsapp">No. WhatsApp <span className="text-destructive">*</span></Label>
+            <Label htmlFor="lastName">Last Name <span className="text-destructive">*</span></Label>
             <Input
-              id="whatsapp"
-              value={form.whatsapp}
-              onChange={(e) => updateField("whatsapp", e.target.value)}
+              id="lastName"
+              value={form.lastName}
+              onChange={(e) => updateField("lastName", e.target.value)}
+              placeholder="Doe"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number <span className="text-destructive">*</span></Label>
+            <Input
+              id="phone"
+              value={form.phone}
+              onChange={(e) => updateField("phone", e.target.value)}
               placeholder="e.g. +62812..."
             />
           </div>

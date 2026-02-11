@@ -215,6 +215,8 @@ export default function SelectPackage() {
   }, [fetchPackages]);
 
   const handlePackageSelect = (pkgId: string, price: number, addOns: Record<string, number>) => {
+    // If admin assigned a package, don't allow changing
+    if (adminAssignedPkgId && pkgId !== adminAssignedPkgId) return;
     setSelectedPackage(pkgId);
     setTotalPrice(price);
     setSelectedAddOns(addOns);
@@ -261,7 +263,7 @@ export default function SelectPackage() {
         user_id: user.id,
         package_id: selectedPackage,
         status: 'pending',
-        duration_months: 1,
+        duration_months: adminAssignedDuration ?? 1,
       });
       if (packageError) throw packageError;
 
@@ -367,34 +369,38 @@ export default function SelectPackage() {
                 <> · Durasi: <span className="font-medium text-foreground">{adminAssignedDuration >= 12 ? `${adminAssignedDuration / 12} Tahun` : `${adminAssignedDuration} Bulan`}</span></>
               ) : null}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">Anda masih bisa mengubah pilihan di bawah ini.</p>
+            <p className="text-xs text-muted-foreground mt-1">Paket yang dipilih tidak dapat diubah.</p>
           </div>
         )}
 
         <div className="mx-auto max-w-6xl">
           <div className="flex flex-wrap gap-8 justify-center">
-            {sortedPackages.map((pkg) => (
-              <PackageCard
-                key={pkg.id}
-                name={pkg.name}
-                type={pkg.type}
-                description={pkg.description}
-                basePrice={pkg.price}
-                features={pkg.features}
-                addOns={[]}
-                isBestSeller={pkg.is_best_seller}
-                isRecommended={pkg.is_recommended}
-                isVip={pkg.is_vip}
-                isPopular={businessStage === 'new' ? pkg.type === 'growth' : pkg.type === 'scale'}
-                isSelected={selectedPackage === pkg.id}
-                isMonthlyBase={isMonthlyBase(pkg)}
-                durationPlan={durationPlanByPackageId[pkg.id] ?? null}
-                durationDiscountFallback={durationDiscountByPackageId[pkg.id] ?? 0}
-                hideAddOns
-                hidePricing
-                onSelect={(price) => handlePackageSelect(pkg.id, price, {})}
-              />
-            ))}
+            {sortedPackages.map((pkg) => {
+              const isDisabled = !!adminAssignedPkgId && pkg.id !== adminAssignedPkgId;
+              return (
+                <div key={pkg.id} className={isDisabled ? "opacity-50 pointer-events-none" : ""}>
+                  <PackageCard
+                    name={pkg.name}
+                    type={pkg.type}
+                    description={pkg.description}
+                    basePrice={pkg.price}
+                    features={pkg.features}
+                    addOns={[]}
+                    isBestSeller={pkg.is_best_seller}
+                    isRecommended={pkg.is_recommended}
+                    isVip={pkg.is_vip}
+                    isPopular={businessStage === 'new' ? pkg.type === 'growth' : pkg.type === 'scale'}
+                    isSelected={selectedPackage === pkg.id}
+                    isMonthlyBase={isMonthlyBase(pkg)}
+                    durationPlan={durationPlanByPackageId[pkg.id] ?? null}
+                    durationDiscountFallback={durationDiscountByPackageId[pkg.id] ?? 0}
+                    hideAddOns
+                    hidePricing
+                    onSelect={(price) => handlePackageSelect(pkg.id, price, {})}
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
 
