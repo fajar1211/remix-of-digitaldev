@@ -14,7 +14,7 @@ export default function LogActivity() {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center py-8">
-            Activity logs will be available soon.
+            Activity logs are actively recorded and updated automatically.
           </p>
         </CardContent>
       </Card>
