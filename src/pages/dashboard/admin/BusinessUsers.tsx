@@ -25,7 +25,6 @@ import {
 
 import { BusinessUserActions } from "./business-users/BusinessUserActions";
 import { invokeWithAuth } from "@/lib/invokeWithAuth";
-import { QuickCreateAccountDialog } from "./components/QuickCreateAccountDialog";
 
  type BusinessStatus = "pending" | "approved" | "active" | "suspended" | "expired";
 
@@ -224,18 +223,10 @@ export default function AdminBusinessUsers() {
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <QuickCreateAccountDialog
-            title="Add New Business"
-            description="Create a USER account (email + password). The user will be auto-confirmed."
-            functionName="admin-create-user"
-            onCreated={() => void fetchBusinessUsers()}
-            triggerContent={
-              <span className="inline-flex items-center">
-                <Plus className="h-4 w-4 mr-2" />
-                Add New Business
-              </span>
-            }
-          />
+          <Button type="button" onClick={() => navigate("/dashboard/admin/business-users/new")}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add New Business
+          </Button>
         </div>
       </header>
 
