@@ -688,14 +688,14 @@ export default function MyPackage() {
         <p className="text-muted-foreground">View your active package and available upgrades</p>
       </div>
 
-      {/* Single column layout: Current Package then Available Packages */}
-      <div className="space-y-8">
-        {/* Current Package */}
-        <div className="space-y-4">
-          <h2 className="text-lg sm:text-xl font-semibold text-foreground">Current Package</h2>
-
+      {/* All 3 packages in a row on desktop */}
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {/* Current Package */}
+          <div className="space-y-2">
+            <h2 className="text-sm font-semibold text-primary uppercase tracking-wide">Current Package</h2>
           {activePackage ? (
-            <Card className="border-primary/30">
+            <Card className="border-primary/30 h-full">
               <CardHeader>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
@@ -894,22 +894,15 @@ export default function MyPackage() {
               <CardContent className="py-8 text-center">
                 <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-foreground">No active package</h3>
-                <p className="text-muted-foreground">Choose a package on the right to get started</p>
+                <p className="text-muted-foreground">Choose a package to get started</p>
               </CardContent>
             </Card>
           )}
-        </div>
+          </div>
 
-        {/* Available Packages */}
-        <div className="space-y-4">
-          <h2 className="text-lg sm:text-xl font-semibold text-foreground">
-            Available Packages
-          </h2>
-
-          {upgradePackages.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              {upgradePackages.map((pkg) => {
-                const isRecommended = false; // no single recommended tier; all are equal options
+          {/* Available Packages */}
+          {upgradePackages.map((pkg) => {
+                const isRecommended = false;
 
                 const upgradeDurationOptions = buildDurationOptionsFromDb(
                   durationRowsByPackageId[String(pkg.id)]
@@ -940,6 +933,8 @@ export default function MyPackage() {
                 });
 
                 return (
+                  <div key={pkg.id} className="space-y-2">
+                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Available Package</h2>
                   <Card
                     key={pkg.id}
                     className={
@@ -1129,6 +1124,14 @@ export default function MyPackage() {
                       <Button
                         variant={isRecommended ? "default" : "outline"}
                         className="w-full"
+                        onClick={() => {
+                          const pkgType = normalizeTier(pkg.type ?? pkg.name);
+                          if (pkgType === "starter" || pkgType.includes("website")) {
+                            navigate("/order/choose-domain");
+                          } else {
+                            navigate("/order/select-plan");
+                          }
+                        }}
                       >
                         Upgrade to {pkg.name}
                         <ArrowUpRight className="h-4 w-4 ml-2" />
@@ -1139,26 +1142,9 @@ export default function MyPackage() {
                       </p>
                     </CardContent>
                   </Card>
+                  </div>
                 );
               })}
-            </div>
-          ) : activePackage ? (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <Check className="h-12 w-12 text-primary mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-foreground">You’re on the highest plan</h3>
-                <p className="text-muted-foreground">
-                  Need more features? Contact our support team for a custom Enterprise plan.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <p className="text-muted-foreground">No packages available right now.</p>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
 
