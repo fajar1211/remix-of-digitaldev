@@ -688,9 +688,9 @@ export default function MyPackage() {
         <p className="text-muted-foreground">View your active package and available upgrades</p>
       </div>
 
-      {/* Tablet & mobile: stack (1 column) so cards are full width; Desktop: 2 columns */}
-      <div className="grid gap-8 xl:grid-cols-2 items-start">
-        {/* LEFT: Active Package */}
+      {/* Single column layout: Current Package then Available Packages */}
+      <div className="space-y-8">
+        {/* Current Package */}
         <div className="space-y-4">
           <h2 className="text-lg sm:text-xl font-semibold text-foreground">Current Package</h2>
 
@@ -900,14 +900,14 @@ export default function MyPackage() {
           )}
         </div>
 
-        {/* RIGHT: Upgrade Options */}
-        <div className="space-y-4 pt-2 xl:pt-0">
+        {/* Available Packages */}
+        <div className="space-y-4">
           <h2 className="text-lg sm:text-xl font-semibold text-foreground">
             Available Packages
           </h2>
 
           {upgradePackages.length > 0 ? (
-            <div className="grid gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
               {upgradePackages.map((pkg) => {
                 const isRecommended = false; // no single recommended tier; all are equal options
 
