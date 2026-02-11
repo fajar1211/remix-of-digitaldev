@@ -43,12 +43,35 @@ export default function SelectPackage() {
   const [dbAddOnsByPackageId, setDbAddOnsByPackageId] = useState<Record<string, DbAddOn[]>>({});
   const [durationPlanByPackageId, setDurationPlanByPackageId] = useState<Record<string, DurationPlanMeta>>({});
   const [durationDiscountByPackageId, setDurationDiscountByPackageId] = useState<Record<string, number>>({});
+  /** Whether admin pre-assigned a package (read-only info) */
+  const [adminAssignedPkgId, setAdminAssignedPkgId] = useState<string | null>(null);
+  const [adminAssignedDuration, setAdminAssignedDuration] = useState<number | null>(null);
 
   useEffect(() => {
     const stage = (sessionStorage.getItem('onboarding_businessStage') as 'new' | 'growing') || 'new';
     setBusinessStage(stage);
   }, []);
 
+  // Pre-fill package from admin-assigned user_packages (if any)
+  useEffect(() => {
+    if (!user) return;
+    const prefill = async () => {
+      const { data } = await (supabase as any)
+        .from('user_packages')
+        .select('package_id, duration_months')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (data && data.length > 0) {
+        const row = data[0];
+        setAdminAssignedPkgId(row.package_id);
+        setAdminAssignedDuration(row.duration_months ?? null);
+        setSelectedPackage(row.package_id);
+      }
+    };
+    void prefill();
+  }, [user]);
   const fetchPackages = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -334,6 +357,19 @@ export default function SelectPackage() {
               : 'Select the plan to grow your existing business'}
           </p>
         </div>
+
+        {adminAssignedPkgId && (
+          <div className="mx-auto max-w-2xl rounded-lg border border-primary/30 bg-primary/5 p-4 text-center text-sm text-foreground">
+            <p className="font-medium">Paket telah ditentukan oleh admin</p>
+            <p className="text-muted-foreground mt-1">
+              Paket: <span className="font-medium text-foreground">{packages.find((p) => p.id === adminAssignedPkgId)?.name ?? '—'}</span>
+              {adminAssignedDuration ? (
+                <> · Durasi: <span className="font-medium text-foreground">{adminAssignedDuration >= 12 ? `${adminAssignedDuration / 12} Tahun` : `${adminAssignedDuration} Bulan`}</span></>
+              ) : null}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Anda masih bisa mengubah pilihan di bawah ini.</p>
+          </div>
+        )}
 
         <div className="mx-auto max-w-6xl">
           <div className="flex flex-wrap gap-8 justify-center">

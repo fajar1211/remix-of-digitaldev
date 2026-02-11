@@ -1,11 +1,11 @@
 // Supabase Edge Function: admin-create-user
 // Creates a new auth user without email confirmation, assigns role=user, and seeds businesses/profile.
+// Now also supports province, city, packageId, durationMonths from admin form.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  // Supabase JS adds x-supabase-client-platform; include it to avoid CORS 'Failed to fetch' in browsers.
   "Access-Control-Allow-Headers": "authorization, x-client-info, x-supabase-client-platform, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
@@ -16,6 +16,10 @@ type Payload = {
   fullName?: string;
   businessName?: string;
   phone?: string;
+  province?: string;
+  city?: string;
+  packageId?: string;
+  durationMonths?: number;
 };
 
 Deno.serve(async (req) => {
@@ -106,23 +110,45 @@ Deno.serve(async (req) => {
 
     // Seed businesses row (optional fields)
     const businessName = (body.businessName ?? "").trim();
+    const province = (body.province ?? "").trim();
+    const city = (body.city ?? "").trim();
+
     await admin.from("businesses").insert({
       user_id: newUser.id,
       business_name: businessName || null,
       email: email,
       phone_number: (body.phone ?? "").trim() || null,
+      country: "Indonesia",
+      state: province || null,
+      city: city || null,
     });
 
     // Update profile extra fields (profile row already created by trigger)
     const phone = (body.phone ?? "").trim();
-    if (fullName || phone) {
+    const profileUpdate: Record<string, unknown> = {};
+    if (fullName) profileUpdate.name = fullName;
+    if (phone) profileUpdate.phone = phone;
+    if (province) profileUpdate.state = province;
+    if (city) profileUpdate.city = city;
+    profileUpdate.country = "Indonesia";
+
+    if (Object.keys(profileUpdate).length > 0) {
       await admin
         .from("profiles")
-        .update({
-          name: fullName || undefined,
-          phone: phone || undefined,
-        })
+        .update(profileUpdate)
         .eq("id", newUser.id);
+    }
+
+    // Insert user_packages if packageId provided
+    const packageId = (body.packageId ?? "").trim();
+    const durationMonths = Number(body.durationMonths ?? 0);
+    if (packageId) {
+      await admin.from("user_packages").insert({
+        user_id: newUser.id,
+        package_id: packageId,
+        status: "pending",
+        duration_months: durationMonths > 0 ? durationMonths : 1,
+      });
     }
 
     return new Response(
