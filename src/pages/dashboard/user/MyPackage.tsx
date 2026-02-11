@@ -23,6 +23,28 @@ import {
 import { toast } from "sonner";
 import { z } from "zod";
 
+/** Format number as IDR currency: Rp 1.500.000 */
+function formatIdr(value: number): string {
+  if (!Number.isFinite(value) || value === 0) return "Rp 0";
+  return "Rp " + Math.round(value).toLocaleString("id-ID");
+}
+
+/** Key used in website_settings for subscription plans per package */
+const SETTINGS_SUBSCRIPTION_PLANS_KEY = "order_subscription_plans";
+function getSubscriptionPlansKey(packageId?: string) {
+  const id = String(packageId ?? "").trim();
+  return id ? `${SETTINGS_SUBSCRIPTION_PLANS_KEY}:${id}` : SETTINGS_SUBSCRIPTION_PLANS_KEY;
+}
+
+type SubscriptionPlanRow = {
+  years: number;
+  label: string;
+  price_usd: number; // actually IDR despite the legacy key name
+  base_price_idr: number;
+  discount_percent: number;
+  is_active: boolean;
+};
+
 interface UserPackage {
   id: string;
   package_id?: string;
@@ -69,17 +91,6 @@ type AddOnSelectionRow = {
 };
 
 const addOnQuantitySchema = z.number().int().min(0);
-
-// Package upgrade recommendations based on current package
-const packageUpgradeRecommendations: Record<string, string> = {
-  starter: "growth",
-  growth: "pro",
-  pro: "optimize",
-  optimize: "scale",
-  scale: "dominate",
-  dominate: "custom",
-  custom: "", // Already at top
-};
 
 const PACKAGE_TIER_ORDER = ["starter", "growth", "pro", "optimize", "scale", "dominate", "custom"] as const;
 
@@ -146,6 +157,7 @@ export default function MyPackage() {
   const [savingAddOnId, setSavingAddOnId] = useState<string | null>(null);
 
   const [durationRowsByPackageId, setDurationRowsByPackageId] = useState<Record<string, PackageDurationRow[]>>({});
+  const [plansByPackageId, setPlansByPackageId] = useState<Record<string, SubscriptionPlanRow[]>>({});
   const [savingDuration, setSavingDuration] = useState(false);
 
   // Upgrade form: chosen duration per upgrade package card
@@ -280,6 +292,47 @@ export default function MyPackage() {
 
           setDurationRowsByPackageId((prev) => ({ ...prev, ...grouped }));
         }
+
+        // Fetch subscription plans from website_settings for ALL packages (synced with duration-packages admin)
+        const plansGrouped: Record<string, SubscriptionPlanRow[]> = {};
+        for (const pid of pkgIds) {
+          try {
+            const key = getSubscriptionPlansKey(pid);
+            const { data: row } = await (supabase as any)
+              .from("website_settings")
+              .select("value")
+              .eq("key", key)
+              .maybeSingle();
+
+            const v = row?.value ?? (
+              key !== SETTINGS_SUBSCRIPTION_PLANS_KEY
+                ? (
+                    await (supabase as any)
+                      .from("website_settings")
+                      .select("value")
+                      .eq("key", SETTINGS_SUBSCRIPTION_PLANS_KEY)
+                      .maybeSingle()
+                  )?.data?.value
+                : undefined
+            );
+
+            if (Array.isArray(v)) {
+              plansGrouped[pid] = (v as any[])
+                .filter((r: any) => r?.is_active !== false && Number(r?.years) > 0)
+                .map((r: any) => ({
+                  years: Number(r.years),
+                  label: String(r.label ?? `${r.years} Year${r.years > 1 ? "s" : ""}`),
+                  price_usd: Number(r.price_usd ?? 0),
+                  base_price_idr: Number(r.base_price_idr ?? 0),
+                  discount_percent: Number(r.discount_percent ?? 0),
+                  is_active: r.is_active !== false,
+                }));
+            }
+          } catch {
+            // ignore per-package plan fetch errors
+          }
+        }
+        setPlansByPackageId(plansGrouped);
       }
 
       // Fetch add-ons for the current package + upgrade packages (Onboarding add-ons)
@@ -459,40 +512,17 @@ export default function MyPackage() {
     }
   };
 
-  // Filter packages to only show those with higher price than active package
+  // Show other packages (excluding current) as Available Packages
   const getUpgradePackages = () => {
     if (!activePackage) {
       return availablePackages;
     }
 
-    const currentType = normalizeTier(activePackage.packages.type);
-    const currentName = normalizeTier(activePackage.packages.name);
-    const recommendedType = normalizeTier(packageUpgradeRecommendations[currentType] || "");
-
-    // Only recommend 1 tier above.
-    if (!recommendedType) return [];
-
-    const exact = availablePackages.find(
-      (pkg) => normalizeTier(pkg.type) === recommendedType || normalizeTier(pkg.name) === recommendedType
-    );
-
-    // If not found, fall back to the next tier by our known order.
-    if (exact) return [exact];
-
-    const currentIndex = (PACKAGE_TIER_ORDER as readonly string[]).indexOf(currentType || currentName);
-    const nextTier = currentIndex >= 0 ? (PACKAGE_TIER_ORDER as readonly string[])[currentIndex + 1] : undefined;
-    if (!nextTier) return [];
-
-    const fallback = availablePackages.find(
-      (pkg) => normalizeTier(pkg.type) === nextTier || normalizeTier(pkg.name) === nextTier
-    );
-
-    return fallback ? [fallback] : [];
+    const currentPkgId = String(activePackage.package_id ?? "");
+    return availablePackages.filter((pkg) => String(pkg.id) !== currentPkgId);
   };
 
   const upgradePackages = getUpgradePackages();
-  const currentType = activePackage?.packages.type?.toLowerCase() || "";
-  const recommendedType = packageUpgradeRecommendations[currentType] || "";
 
   // Initialize upgrade duration selection per package (default: first non-1-month option)
   useEffect(() => {
@@ -591,14 +621,14 @@ export default function MyPackage() {
     return base + currentAddOnsMonthly;
   }, [activePackage?.packages.price, currentAddOnsMonthly]);
 
-  const discountedTotalForDuration = useMemo(() => {
-    if (!activePackage) return 0;
-    return computeDiscountedTotal({
-      monthlyPrice: currentMonthlyWithAddOns,
-      months: selectedDurationMeta.months,
-      discountPercent: selectedDurationMeta.discountPercent,
-    });
-  }, [activePackage, currentMonthlyWithAddOns, selectedDurationMeta.discountPercent, selectedDurationMeta.months]);
+  /** Get the plan-based IDR price for the current package's selected duration */
+  const currentPlanPriceIdr = useMemo(() => {
+    if (!activePackageId) return null;
+    const plans = plansByPackageId[activePackageId] ?? [];
+    const durationYears = selectedDurationMonths / 12;
+    const match = plans.find((p) => Math.abs(p.years - durationYears) < 0.01);
+    return match ? match.price_usd : null; // price_usd is actually IDR
+  }, [activePackageId, plansByPackageId, selectedDurationMonths]);
 
   const handleChangeDuration = async (monthsStr: string) => {
     if (!user || !activePackage) return;
@@ -741,7 +771,7 @@ export default function MyPackage() {
                               {addOn.unit_step} {addOn.unit} / month
                             </p>
                             <p className="text-xs text-muted-foreground break-words whitespace-normal">
-                              +${addOn.price_per_unit} for {addOn.unit_step} {addOn.unit}
+                              +{formatIdr(addOn.price_per_unit)} for {addOn.unit_step} {addOn.unit}
                               {addOn.max_quantity ? ` • max ${addOn.max_quantity}` : ""}
                             </p>
                           </div>
@@ -787,8 +817,8 @@ export default function MyPackage() {
                 <div className="pt-2">
                   <div className="flex flex-col gap-3">
                     <p className="text-2xl font-bold text-foreground">
-                      ${activePackage.packages.price}
-                      <span className="text-sm font-normal text-muted-foreground"> /month</span>
+                      {formatIdr(activePackage.packages.price)}
+                      <span className="text-sm font-normal text-muted-foreground"> /bulan</span>
                     </p>
 
                     <div className="grid gap-2">
@@ -823,7 +853,9 @@ export default function MyPackage() {
 
                       <p className="text-sm text-muted-foreground">
                         Total ({selectedDurationMeta.label}):{" "}
-                        <span className="font-medium text-foreground">${discountedTotalForDuration}</span>
+                        <span className="font-medium text-foreground">
+                          {currentPlanPriceIdr != null ? formatIdr(currentPlanPriceIdr) : formatIdr(computeDiscountedTotal({ monthlyPrice: currentMonthlyWithAddOns, months: selectedDurationMeta.months, discountPercent: selectedDurationMeta.discountPercent }))}
+                        </span>
                       </p>
 
                       {visibleDurationOptions.length === 0 && (
@@ -871,13 +903,13 @@ export default function MyPackage() {
         {/* RIGHT: Upgrade Options */}
         <div className="space-y-4 pt-2 xl:pt-0">
           <h2 className="text-lg sm:text-xl font-semibold text-foreground">
-            {activePackage ? "Upgrade Options" : "Available Packages"}
+            Available Packages
           </h2>
 
           {upgradePackages.length > 0 ? (
             <div className="grid gap-4">
               {upgradePackages.map((pkg) => {
-                const isRecommended = normalizeTier(pkg.type) === normalizeTier(recommendedType);
+                const isRecommended = false; // no single recommended tier; all are equal options
 
                 const upgradeDurationOptions = buildDurationOptionsFromDb(
                   durationRowsByPackageId[String(pkg.id)]
@@ -942,13 +974,8 @@ export default function MyPackage() {
                         </div>
 
                         <div className="text-right shrink-0">
-                          <div className="font-bold text-foreground text-xl leading-none">${pkg.price}</div>
-                          <div className="text-xs text-muted-foreground">/month</div>
-                          {activePackage && (
-                            <Badge variant="secondary" className="mt-2 bg-primary/10 text-primary">
-                              +${Math.max(0, pkg.price - activePackage.packages.price)}/mo
-                            </Badge>
-                          )}
+                          <div className="font-bold text-foreground text-xl leading-none">{formatIdr(pkg.price)}</div>
+                          <div className="text-xs text-muted-foreground">/bulan</div>
                         </div>
                       </div>
                     </CardHeader>
@@ -1000,7 +1027,7 @@ export default function MyPackage() {
                                     {addOn.unit_step} {addOn.unit} / month
                                   </p>
                                   <p className="text-xs text-muted-foreground break-words whitespace-normal">
-                                    +${addOn.price_per_unit} for {addOn.unit_step} {addOn.unit}
+                                    +{formatIdr(addOn.price_per_unit)} for {addOn.unit_step} {addOn.unit}
                                     {addOn.max_quantity ? ` • max ${addOn.max_quantity}` : ""}
                                   </p>
                                 </div>
@@ -1082,7 +1109,13 @@ export default function MyPackage() {
                         <p className="text-sm text-muted-foreground">
                           Total ({selectedUpgradeMeta.label || "—"}):{" "}
                           <span className="font-medium text-foreground">
-                            {selectedUpgradeMeta.months ? `$${discountedUpgradeTotal}` : "—"}
+                            {(() => {
+                              if (!selectedUpgradeMeta.months) return "—";
+                              const upgradePlans = plansByPackageId[String(pkg.id)] ?? [];
+                              const durationYears = selectedUpgradeMeta.months / 12;
+                              const match = upgradePlans.find((p) => Math.abs(p.years - durationYears) < 0.01);
+                              return match ? formatIdr(match.price_usd) : formatIdr(discountedUpgradeTotal);
+                            })()}
                           </span>
                         </p>
 
