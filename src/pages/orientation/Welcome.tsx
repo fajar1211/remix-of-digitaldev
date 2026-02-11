@@ -2,18 +2,14 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { BrandHeader } from '@/components/layout/BrandHeader';
 
 export default function OrientationWelcome() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-background to-muted/30 px-4 py-12">
       <div className="w-full max-w-lg space-y-8 animate-fade-in text-center">
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <span className="text-2xl font-bold text-primary-foreground">E</span>
-          </div>
-          <span className="text-2xl font-bold text-foreground">EasyMarketingAssist</span>
-        </div>
+        <BrandHeader />
 
         <Card className="shadow-soft border-primary/20">
           <CardContent className="pt-8 pb-8 px-8 space-y-6">
