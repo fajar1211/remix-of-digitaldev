@@ -158,6 +158,8 @@ export default function MyPackage() {
 
   const [durationRowsByPackageId, setDurationRowsByPackageId] = useState<Record<string, PackageDurationRow[]>>({});
   const [plansByPackageId, setPlansByPackageId] = useState<Record<string, SubscriptionPlanRow[]>>({});
+  /** basePriceIdr from website_settings (order_subscription_plans) — synced with /packages page */
+  const [basePriceByPackageId, setBasePriceByPackageId] = useState<Record<string, number>>({});
   const [savingDuration, setSavingDuration] = useState(false);
 
   // Upgrade form: chosen duration per upgrade package card
@@ -333,6 +335,20 @@ export default function MyPackage() {
           }
         }
         setPlansByPackageId(plansGrouped);
+
+        // Extract basePriceIdr for monthly display (synced with /packages page)
+        const basePriceMap: Record<string, number> = {};
+        for (const pid of pkgIds) {
+          const plans = plansGrouped[pid];
+          if (plans && plans.length > 0) {
+            // Use the base_price_idr from the first plan (year 1) as the monthly price
+            const year1 = plans.find((p) => p.years === 1) ?? plans[0];
+            if (year1 && year1.base_price_idr > 0) {
+              basePriceMap[pid] = year1.base_price_idr;
+            }
+          }
+        }
+        setBasePriceByPackageId(basePriceMap);
       }
 
       // Fetch add-ons for the current package + upgrade packages (Onboarding add-ons)
@@ -513,16 +529,13 @@ export default function MyPackage() {
   };
 
   // Show other packages (excluding current) as Available Packages
-  const getUpgradePackages = () => {
+  const upgradePackages = useMemo(() => {
     if (!activePackage) {
       return availablePackages;
     }
-
     const currentPkgId = String(activePackage.package_id ?? "");
     return availablePackages.filter((pkg) => String(pkg.id) !== currentPkgId);
-  };
-
-  const upgradePackages = getUpgradePackages();
+  }, [activePackage, availablePackages]);
 
   // Initialize upgrade duration selection per package (default: first non-1-month option)
   useEffect(() => {
@@ -616,10 +629,15 @@ export default function MyPackage() {
     }, 0);
   }, [activePackageId, addOnsByPackageId, addOnSelectionsByAddOnId]);
 
+  /** Resolved monthly price: prefer basePriceIdr from website_settings, fallback to packages.price */
+  const resolvedMonthlyPrice = useMemo(() => {
+    if (!activePackageId) return 0;
+    return basePriceByPackageId[activePackageId] ?? Number(activePackage?.packages.price || 0);
+  }, [activePackageId, basePriceByPackageId, activePackage?.packages.price]);
+
   const currentMonthlyWithAddOns = useMemo(() => {
-    const base = Number(activePackage?.packages.price || 0);
-    return base + currentAddOnsMonthly;
-  }, [activePackage?.packages.price, currentAddOnsMonthly]);
+    return resolvedMonthlyPrice + currentAddOnsMonthly;
+  }, [resolvedMonthlyPrice, currentAddOnsMonthly]);
 
   /** Get the plan-based IDR price for the current package's selected duration */
   const currentPlanPriceIdr = useMemo(() => {
@@ -817,7 +835,7 @@ export default function MyPackage() {
                 <div className="pt-2">
                   <div className="flex flex-col gap-3">
                     <p className="text-2xl font-bold text-foreground">
-                      {formatIdr(activePackage.packages.price)}
+                      {formatIdr(resolvedMonthlyPrice)}
                       <span className="text-sm font-normal text-muted-foreground"> /bulan</span>
                     </p>
 
@@ -870,19 +888,40 @@ export default function MyPackage() {
                 {/* Action button (changes by status) */}
                 {statusSource === "approved" ? (
                   <div className="pt-2">
-                    <Button className="w-full" onClick={() => navigate("/order/choose-domain")}>
+                    <Button className="w-full" onClick={() => {
+                      const t = normalizeTier(activePackage.packages.type ?? activePackage.packages.name);
+                      if (t === "starter" || t.includes("website")) {
+                        navigate("/order/choose-domain");
+                      } else {
+                        navigate("/order/select-plan");
+                      }
+                    }}>
                       Pay Now
                     </Button>
                   </div>
                 ) : statusSource === "active" && isActiveExpiringWithinOneMonth ? (
                   <div className="pt-2">
-                    <Button className="w-full" variant="outline" onClick={() => navigate("/order/choose-domain")}>
+                    <Button className="w-full" variant="outline" onClick={() => {
+                      const t = normalizeTier(activePackage.packages.type ?? activePackage.packages.name);
+                      if (t === "starter" || t.includes("website")) {
+                        navigate("/order/choose-domain");
+                      } else {
+                        navigate("/order/select-plan");
+                      }
+                    }}>
                       Extend Duration
                     </Button>
                   </div>
                 ) : statusSource === "expired" ? (
                   <div className="pt-2">
-                    <Button className="w-full" variant="outline" onClick={() => navigate("/order/choose-domain")}>
+                    <Button className="w-full" variant="outline" onClick={() => {
+                      const t = normalizeTier(activePackage.packages.type ?? activePackage.packages.name);
+                      if (t === "starter" || t.includes("website")) {
+                        navigate("/order/choose-domain");
+                      } else {
+                        navigate("/order/select-plan");
+                      }
+                    }}>
                       Renew Plan
                     </Button>
                   </div>
@@ -924,7 +963,7 @@ export default function MyPackage() {
                   return sum + qty * Number(addOn.price_per_unit ?? 0);
                 }, 0);
 
-                const upgradeMonthlyWithAddOns = Number(pkg.price || 0) + upgradeAddOnsMonthly;
+                const upgradeMonthlyWithAddOns = (basePriceByPackageId[String(pkg.id)] ?? Number(pkg.price || 0)) + upgradeAddOnsMonthly;
 
                 const discountedUpgradeTotal = computeDiscountedTotal({
                   monthlyPrice: upgradeMonthlyWithAddOns,
@@ -968,8 +1007,8 @@ export default function MyPackage() {
                           <CardDescription className="mt-1">{pkg.description}</CardDescription>
                         </div>
 
-                        <div className="text-right shrink-0">
-                          <div className="font-bold text-foreground text-xl leading-none">{formatIdr(pkg.price)}</div>
+                <div className="text-right shrink-0">
+                          <div className="font-bold text-foreground text-xl leading-none">{formatIdr(basePriceByPackageId[String(pkg.id)] ?? pkg.price)}</div>
                           <div className="text-xs text-muted-foreground">/bulan</div>
                         </div>
                       </div>
