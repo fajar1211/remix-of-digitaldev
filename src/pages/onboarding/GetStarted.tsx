@@ -89,7 +89,6 @@ export default function GetStarted() {
                   placeholder="John"
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  disabled={isPrefilled}
                 />
               </div>
 
@@ -100,7 +99,6 @@ export default function GetStarted() {
                   placeholder="Doe"
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  disabled={isPrefilled}
                 />
               </div>
             </div>
