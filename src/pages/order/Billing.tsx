@@ -128,37 +128,29 @@ export default function Billing() {
     try {
       const sessionRes = await supabase.auth.getSession();
       const userId = sessionRes.data.session?.user?.id ?? "anonymous";
+      const nameParts = (state.details.name ?? "").trim().split(/\s+/);
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
 
       await (supabase as any).from("super_admin_audit_logs").insert({
         actor_user_id: userId,
         provider: "order",
         action: "order_billing_pay",
         metadata: {
-          step_select_plan: {
-            package_id: state.selectedPackageId,
-            package_name: state.selectedPackageName,
-          },
-          step_checkout: {
-            name: state.details.name,
-            email: state.details.email,
-            phone: state.details.phone,
-            businessName: state.details.businessName,
-            provinceCode: state.details.provinceCode,
-            provinceName: state.details.provinceName,
-            city: state.details.city,
-          },
-          step_subscribe: {
-            subscription_years: state.subscriptionYears,
-            add_ons: state.addOns,
-            subscription_add_ons: state.subscriptionAddOns,
-          },
-          billing: {
-            domain: state.domain,
-            template_id: state.selectedTemplateId,
-            template_name: state.selectedTemplateName,
-            promo_code: state.promoCode,
-            amount_idr: totalAfterPromoIdr,
-          },
+          first_name: firstName,
+          last_name: lastName,
+          email: state.details.email,
+          phone: state.details.phone,
+          business_name: state.details.businessName || null,
+          province: state.details.provinceName,
+          city: state.details.city,
+          package_id: state.selectedPackageId,
+          package_name: state.selectedPackageName,
+          subscription_years: state.subscriptionYears,
+          add_ons: state.addOns,
+          subscription_add_ons: state.subscriptionAddOns,
+          promo_code: state.promoCode,
+          amount_idr: totalAfterPromoIdr,
         },
       });
     } catch (e) {
