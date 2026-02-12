@@ -29,6 +29,8 @@ export type OrderSubscriptionPlan = {
   price_usd?: number;
   is_active?: boolean;
   sort_order?: number;
+  discount_percent?: number;
+  base_price_idr?: number;
 };
 
 const SETTINGS_TEMPLATES_KEY = "order_templates";
@@ -115,6 +117,8 @@ function parseSubscriptionPlans(value: unknown): OrderSubscriptionPlan[] {
       const price_usd = safeNumber(obj?.price_usd);
       const is_active = typeof obj?.is_active === "boolean" ? obj.is_active : true;
       const sort_order = safeNumber(obj?.sort_order);
+      const discount_percent = safeNumber(obj?.discount_percent);
+      const base_price_idr = safeNumber(obj?.base_price_idr);
       if (!years || years <= 0) return null;
       return {
         years,
@@ -122,6 +126,8 @@ function parseSubscriptionPlans(value: unknown): OrderSubscriptionPlan[] {
         price_usd,
         is_active,
         sort_order: sort_order ?? years,
+        discount_percent: discount_percent ?? 0,
+        base_price_idr: base_price_idr ?? 0,
       } satisfies OrderSubscriptionPlan;
     })
     .filter(Boolean) as OrderSubscriptionPlan[];
@@ -165,19 +171,14 @@ export function useOrderPublicSettings(domain?: string, selectedPackageId?: stri
       setLoading(true);
       setError(null);
       try {
-        const [{ data: tplRow }, { data: contactRow }, { data: plansRow }] = await Promise.all([
+        // First fetch global settings (templates, contact)
+        const [{ data: tplRow }, { data: contactRow }] = await Promise.all([
           (supabase as any).from("website_settings").select("value").eq("key", SETTINGS_TEMPLATES_KEY).maybeSingle(),
           (supabase as any).from("website_settings").select("value").eq("key", SETTINGS_CONTACT_KEY).maybeSingle(),
-          (supabase as any)
-            .from("website_settings")
-            .select("value")
-            .eq("key", SETTINGS_SUBSCRIPTION_PLANS_KEY)
-            .maybeSingle(),
         ]);
 
         setTemplates(parseTemplates(tplRow?.value));
         setContact(parseContact(contactRow?.value));
-        setSubscriptionPlans(parseSubscriptionPlans(plansRow?.value));
 
         const { data: pricingRow } = await (supabase as any)
           .from("domain_pricing_settings")
@@ -190,7 +191,9 @@ export function useOrderPublicSettings(domain?: string, selectedPackageId?: stri
         const effectivePkgId = selectedPackageId ?? pkgId;
 
         if (effectivePkgId) {
-          const [{ data: pkgRow }, { data: prices }, { data: durations }] = await Promise.all([
+          // Try per-package subscription plans key first, fallback to global key
+          const perPkgKey = `${SETTINGS_SUBSCRIPTION_PLANS_KEY}:${effectivePkgId}`;
+          const [{ data: pkgRow }, { data: prices }, { data: durations }, { data: perPkgPlansRow }, { data: globalPlansRow }] = await Promise.all([
             (supabase as any).from("packages").select("price,name").eq("id", effectivePkgId).maybeSingle(),
             (supabase as any).from("domain_tld_prices").select("tld,price_usd").eq("package_id", effectivePkgId),
             (supabase as any)
@@ -199,7 +202,13 @@ export function useOrderPublicSettings(domain?: string, selectedPackageId?: stri
               .eq("package_id", effectivePkgId)
               .order("sort_order", { ascending: true })
               .order("duration_months", { ascending: true }),
+            (supabase as any).from("website_settings").select("value").eq("key", perPkgKey).maybeSingle(),
+            (supabase as any).from("website_settings").select("value").eq("key", SETTINGS_SUBSCRIPTION_PLANS_KEY).maybeSingle(),
           ]);
+
+          // Use per-package plans if available, otherwise fall back to global
+          const plansValue = perPkgPlansRow?.value ?? globalPlansRow?.value;
+          setSubscriptionPlans(parseSubscriptionPlans(plansValue));
 
           const p = safeNumber((pkgRow as any)?.price);
           setPackagePriceUsd(p ?? null);

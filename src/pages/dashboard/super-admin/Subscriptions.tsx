@@ -563,7 +563,28 @@ export default function SuperAdminSubscriptions() {
 
       toast({ title: "Saved", description: "Subscription plans updated." });
       setIsEditingPlans(false);
-      await fetchPlans();
+      await fetchPlans(pricingPackageId);
+
+      // Also sync discount values to package_durations table
+      try {
+        for (const p of payload) {
+          const months = p.years * 12;
+          await (supabase as any)
+            .from("package_durations")
+            .upsert(
+              {
+                package_id: pricingPackageId,
+                duration_months: months,
+                discount_percent: p.discount_percent,
+                is_active: p.is_active,
+                sort_order: p.sort_order,
+              },
+              { onConflict: "package_id,duration_months" }
+            );
+        }
+      } catch (syncErr) {
+        console.warn("Failed to sync package_durations:", syncErr);
+      }
     } catch (e: any) {
       console.error(e);
       toast({ variant: "destructive", title: "Failed to save", description: e?.message ?? "Unknown error" });

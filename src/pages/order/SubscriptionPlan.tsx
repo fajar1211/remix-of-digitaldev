@@ -21,7 +21,7 @@ export default function SubscriptionPlan() {
   const { t } = useI18n();
   const { state, setSubscriptionYears, setPackage } = useOrder();
 
-  const { subscriptionPlans, pricing, durationRows } = useOrderPublicSettings(state.domain, null);
+  const { subscriptionPlans, pricing } = useOrderPublicSettings(state.domain, null);
 
   useEffect(() => {
     if (!pricing.defaultPackageId) return;
@@ -33,20 +33,6 @@ export default function SubscriptionPlan() {
     });
   }, [pricing.defaultPackageId, pricing.packageName, setPackage, state.selectedPackageId]);
 
-  // Build discount lookup from duration rows
-  const discountByYears = useMemo(() => {
-    const m = new Map<number, number>();
-    for (const r of durationRows || []) {
-      if ((r as any)?.is_active === false) continue;
-      const months = Number((r as any)?.duration_months ?? 0);
-      const discount = Number((r as any)?.discount_percent ?? 0);
-      if (Number.isFinite(months) && months > 0 && months % 12 === 0) {
-        m.set(months / 12, discount);
-      }
-    }
-    return m;
-  }, [durationRows]);
-
   const options = useMemo(
     () =>
       (subscriptionPlans || [])
@@ -57,6 +43,8 @@ export default function SubscriptionPlan() {
           const isActive = p?.is_active !== false;
           const sortOrderRaw = (p as any)?.sort_order;
           const sortOrder = Number.isFinite(Number(sortOrderRaw)) ? Number(sortOrderRaw) : years || 0;
+          const discountPercent = Number(p?.discount_percent ?? 0);
+          const basePriceIdr = Number(p?.base_price_idr ?? 0);
 
           return {
             years,
@@ -64,12 +52,13 @@ export default function SubscriptionPlan() {
             priceIdr,
             isActive,
             sortOrder,
-            discountPercent: discountByYears.get(years) ?? 0,
+            discountPercent,
+            basePriceIdr,
           };
         })
         .filter((opt) => opt.years > 0 && opt.isActive)
         .sort((a, b) => a.sortOrder - b.sortOrder),
-    [subscriptionPlans, discountByYears],
+    [subscriptionPlans],
   );
 
   const selected = state.subscriptionYears;
@@ -116,7 +105,9 @@ export default function SubscriptionPlan() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-base font-semibold text-foreground">{finalLabel}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">{t("order.allIn")}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {opt.basePriceIdr > 0 ? `${formatIdr(opt.basePriceIdr)} / tahun` : t("order.allIn")}
+                          </p>
                         </div>
                         {isSelected ? <Badge variant="secondary">{t("order.selected")}</Badge> : <Badge variant="outline">Plan</Badge>}
                       </div>
