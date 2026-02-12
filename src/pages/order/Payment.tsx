@@ -20,6 +20,11 @@ import { usePaypalOrderSettings } from "@/hooks/usePaypalOrderSettings";
 import { PayPalButtonsSection } from "@/components/order/PayPalButtonsSection";
 import { usePackageDurations } from "@/hooks/usePackageDurations";
 import { computeDiscountedTotal } from "@/lib/packageDurations";
+
+function isMonthlyPackageName(name: string | null) {
+  const n = String(name ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  return n.includes("full digital marketing") || n.includes("blog + social media") || n.includes("blog+social media");
+}
 import { createXenditInvoice } from "@/lib/orderPayments";
 
 function formatIdr(value: number) {
@@ -170,38 +175,33 @@ export default function Payment() {
     return m;
   }, [durationRows]);
 
-  const baseTotalUsd = useMemo(() => {
+  const isMonthly = isMonthlyPackageName(state.selectedPackageName);
+  const addOnsMultiplier = isMonthly && state.subscriptionYears ? Number(state.subscriptionYears) * 12 : 1;
+  const effectiveAddOnsTotal = addOnsTotal * addOnsMultiplier;
+
+  // Align with OrderSummaryCard calculation exactly
+  const durationPriceIdr = useMemo(() => {
     if (!state.subscriptionYears) return null;
 
-    const months = Number(state.subscriptionYears) * 12;
-    const discountPercent = discountByMonths.get(months) ?? 0;
-
-    // Prefer Duration & Discount config (package_durations) so it matches /order/subscription.
-    if (discountByMonths.size > 0) {
-      const domain = pricing.domainPriceUsd ?? null;
-      const pkg = pricing.packagePriceUsd ?? null;
-      if (domain == null || pkg == null) return null;
-
-      const baseAnnual = domain + pkg;
-      const monthly = baseAnnual / 12;
-      return computeDiscountedTotal({ monthlyPrice: monthly, months, discountPercent }) + addOnsTotal;
+    if (isMonthly) {
+      const monthlyBase = Number(pricing.packagePriceUsd ?? 0);
+      if (!Number.isFinite(monthlyBase) || monthlyBase <= 0) return null;
+      const months = Number(state.subscriptionYears) * 12;
+      const discountPercent = discountByMonths.get(months) ?? 0;
+      return computeDiscountedTotal({ monthlyPrice: monthlyBase, months, discountPercent });
     }
 
-    // Fallback to legacy website_settings.order_subscription_plans price override.
-    // (years can be string/number depending on source, so coerce to number)
+    // Non-monthly: use subscription plan price directly
     const selectedPlan = (subscriptionPlans || []).find((p: any) => Number(p?.years) === Number(state.subscriptionYears));
-    const planOverrideUsd = (() => {
-      const v = Number((selectedPlan as any)?.price_usd);
-      return Number.isFinite(v) ? v : null;
-    })();
-    if (planOverrideUsd != null) return planOverrideUsd + addOnsTotal;
+    const v = Number((selectedPlan as any)?.price_usd ?? 0);
+    return Number.isFinite(v) && v > 0 ? v : null;
+  }, [discountByMonths, isMonthly, pricing.packagePriceUsd, state.subscriptionYears, subscriptionPlans]);
 
-    const domainUsd = pricing.domainPriceUsd ?? null;
-    const pkgUsd = pricing.packagePriceUsd ?? null;
-    if (domainUsd == null || pkgUsd == null) return null;
-
-    return (domainUsd + pkgUsd) * state.subscriptionYears + addOnsTotal;
-  }, [addOnsTotal, discountByMonths, pricing.domainPriceUsd, pricing.packagePriceUsd, state.subscriptionYears, subscriptionPlans]);
+  const baseTotalUsd = useMemo(() => {
+    if (!state.subscriptionYears) return null;
+    if (durationPriceIdr == null) return null;
+    return durationPriceIdr + effectiveAddOnsTotal;
+  }, [durationPriceIdr, effectiveAddOnsTotal, state.subscriptionYears]);
 
   const totalAfterPromoUsd = useMemo(() => {
     if (baseTotalUsd == null) return null;

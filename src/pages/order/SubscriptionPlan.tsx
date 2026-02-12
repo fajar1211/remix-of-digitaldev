@@ -125,7 +125,7 @@ export default function SubscriptionPlan() {
                         <p className="text-2xl font-bold text-foreground">{opt.priceIdr > 0 ? formatIdr(opt.priceIdr) : "—"}</p>
                         <p className="mt-1 text-xs text-muted-foreground">{t("order.totalFor", { years: opt.years })}</p>
                         {opt.discountPercent > 0 ? (
-                          <Badge variant="secondary" className="mt-2">Diskon {opt.discountPercent}%</Badge>
+                          <Badge variant="destructive" className="mt-2">Diskon {opt.discountPercent}%</Badge>
                         ) : null}
                       </div>
                     </button>

@@ -94,7 +94,7 @@ export default function BusinessBasics() {
         ...prev,
         businessName: data.business_name ?? prev.businessName,
         businessType: data.business_type ?? prev.businessType,
-        country: data.country ?? prev.country,
+        country: data.country || 'Indonesia',
         state: data.state ?? prev.state,
         city: data.city ?? prev.city,
         phoneCode: dbPhoneCode || prev.phoneCode,
@@ -104,21 +104,43 @@ export default function BusinessBasics() {
     void prefillFromDb();
   }, [user]);
 
+  // On mount, default country to Indonesia if not set
+  useEffect(() => {
+    setFormData((prev) => {
+      if (prev.country) return prev;
+      return { ...prev, country: 'Indonesia' };
+    });
+  }, []);
+
+  // Track whether country was changed by user vs initial load to avoid clearing state/city on prefill
+  const [countryInitialized, setCountryInitialized] = useState(false);
+
   useEffect(() => {
     if (formData.country) {
       const country = findCountryByName(formData.country);
       const states = country ? getStatesOfCountry(country.isoCode).map((s) => s.name) : [];
       setAvailableStates(states);
-      setAvailableCities([]);
 
       // Auto-set phone code when country changes
       const nextPhoneCode = country?.phoneCode;
-      setFormData((prev) => ({
-        ...prev,
-        state: '',
-        city: '',
-        phoneCode: prev.phoneCode || nextPhoneCode || '',
-      }));
+
+      if (countryInitialized) {
+        // User changed country manually — clear state/city
+        setAvailableCities([]);
+        setFormData((prev) => ({
+          ...prev,
+          state: '',
+          city: '',
+          phoneCode: prev.phoneCode || nextPhoneCode || '',
+        }));
+      } else {
+        // Initial load — keep prefilled state/city
+        setCountryInitialized(true);
+        setFormData((prev) => ({
+          ...prev,
+          phoneCode: prev.phoneCode || nextPhoneCode || '',
+        }));
+      }
     }
   }, [formData.country]);
 
@@ -348,7 +370,11 @@ export default function BusinessBasics() {
               <Label>Country <span className="text-destructive">*</span></Label>
               <Select
                 value={formData.country}
-                onValueChange={(value) => setFormData({ ...formData, country: value })}
+                onValueChange={(value) => {
+                  setCountryInitialized(true);
+                  setFormData({ ...formData, country: value, state: '', city: '' });
+                }}
+                disabled
               >
                 <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select country" />
