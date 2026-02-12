@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
+import { useMidtransPayments } from "./useMidtransPayments";
 
 type OrderItem = {
   id: string;
@@ -39,6 +40,7 @@ function formatTime(v: unknown) {
 export default function SuperAdminPayments() {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<OrderItem[]>([]);
+  const midtrans = useMidtransPayments();
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -61,7 +63,10 @@ export default function SuperAdminPayments() {
 
   useEffect(() => {
     refresh();
+    midtrans.refresh();
   }, [refresh]);
+
+  const allItems = items;
 
   return (
     <div className="space-y-6">
@@ -72,16 +77,65 @@ export default function SuperAdminPayments() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={refresh} disabled={loading}>
+          <Button variant="outline" onClick={() => { refresh(); midtrans.refresh(); }} disabled={loading || midtrans.loading}>
             <RefreshCcw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
         </div>
       </header>
 
+      {/* Midtrans API Status */}
+      {midtrans.items.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <CardTitle className="text-base">Midtrans API ({midtrans.env}) — {midtrans.items.length} transaksi</CardTitle>
+            {midtrans.loading && <span className="text-sm text-muted-foreground">Memuat…</span>}
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Domain</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Waktu</TableHead>
+                  <TableHead className="text-right">Redirect</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {midtrans.items.map((it) => (
+                  <TableRow key={it.id}>
+                    <TableCell className="font-medium truncate">{it.domain ?? "-"}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="truncate">{it.customer_name ?? "-"}</span>
+                        <span className="text-xs text-muted-foreground truncate">{it.customer_email ?? "-"}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{formatMoney(it.amount_idr, "IDR")}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{(it.midtrans as any)?.transaction_status ?? "-"}</Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{formatTime(it.created_at)}</TableCell>
+                    <TableCell className="text-right">
+                      {it.midtrans_redirect_url ? (
+                        <a href={it.midtrans_redirect_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm underline underline-offset-4">
+                          Open <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : "-"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle className="text-base">Transaksi ({items.length})</CardTitle>
+          <CardTitle className="text-base">Transaksi Database ({allItems.length})</CardTitle>
           {loading ? <span className="text-sm text-muted-foreground">Memuat…</span> : null}
         </CardHeader>
         <CardContent className="p-0">
@@ -99,47 +153,35 @@ export default function SuperAdminPayments() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((it) => (
+              {allItems.map((it) => (
                 <TableRow key={it.id}>
                   <TableCell className="font-medium">
                     <span className="truncate">{it.domain ?? "-"}</span>
                   </TableCell>
-
                   <TableCell>
                     <div className="flex flex-col">
                       <span className="truncate">{it.customer_name ?? "-"}</span>
                       <span className="text-xs text-muted-foreground truncate">{it.customer_email ?? "-"}</span>
                     </div>
                   </TableCell>
-
                   <TableCell>
                     <Badge variant="outline">{it.payment_provider ?? "-"}</Badge>
                   </TableCell>
-
                   <TableCell>
                     <Badge variant="secondary">{it.status ?? "-"}</Badge>
                   </TableCell>
-
                   <TableCell>
                     <span>{formatMoney(it.amount_idr, "IDR")}</span>
                   </TableCell>
-
                   <TableCell>
                     <span className="text-sm">{it.subscription_years ? `${it.subscription_years} tahun` : "-"}</span>
                   </TableCell>
-
                   <TableCell>
                     <span className="text-xs text-muted-foreground">{formatTime(it.created_at)}</span>
                   </TableCell>
-
                   <TableCell className="text-right">
                     {it.midtrans_redirect_url ? (
-                      <a
-                        href={it.midtrans_redirect_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-2 text-sm underline underline-offset-4"
-                      >
+                      <a href={it.midtrans_redirect_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm underline underline-offset-4">
                         Open <ExternalLink className="h-4 w-4" />
                       </a>
                     ) : (
@@ -149,7 +191,7 @@ export default function SuperAdminPayments() {
                 </TableRow>
               ))}
 
-              {!loading && items.length === 0 ? (
+              {!loading && allItems.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
                     Belum ada transaksi.

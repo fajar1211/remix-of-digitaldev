@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Heart, Users, Globe, DollarSign, CheckCircle } from "lucide-react";
+import { ArrowRight, Heart, Users, Globe, Banknote, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PublicLayout } from "@/components/layout/PublicLayout";
@@ -20,7 +20,7 @@ export default function About() {
     { icon: Heart, title: t("about.value1t"), description: t("about.value1d") },
     { icon: Users, title: t("about.value2t"), description: t("about.value2d") },
     { icon: Globe, title: t("about.value3t"), description: t("about.value3d") },
-    { icon: DollarSign, title: t("about.value4t"), description: t("about.value4d") },
+    { icon: Banknote, title: t("about.value4t"), description: t("about.value4d") },
   ];
 
   const benefits = [t("about.b1"), t("about.b2"), t("about.b3"), t("about.b4"), t("about.b5"), t("about.b6")];

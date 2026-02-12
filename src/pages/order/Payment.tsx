@@ -301,6 +301,8 @@ export default function Payment() {
 
     setPaying(true);
     try {
+      await logOrderAudit();
+
       const cardData = {
         card_number: cardNumber.replace(/\s+/g, ""),
         card_exp_month: expMonth,
@@ -364,6 +366,43 @@ export default function Payment() {
     }
   };
 
+  const logOrderAudit = async () => {
+    try {
+      const sessionRes = await supabase.auth.getSession();
+      const userId = sessionRes.data.session?.user?.id ?? "anonymous";
+      const nameParts = (state.details.name ?? "").trim().split(/\s+/);
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+
+      await (supabase as any).from("super_admin_audit_logs").insert({
+        actor_user_id: userId,
+        provider: "order",
+        action: "order_website_pay",
+        metadata: {
+          first_name: firstName,
+          last_name: lastName,
+          email: state.details.email,
+          phone: state.details.phone,
+          business_name: state.details.businessName || null,
+          province: state.details.provinceName,
+          city: state.details.city,
+          domain: state.domain,
+          template_id: state.selectedTemplateId,
+          template_name: state.selectedTemplateName,
+          package_id: state.selectedPackageId,
+          package_name: state.selectedPackageName,
+          subscription_years: state.subscriptionYears,
+          add_ons: state.addOns,
+          subscription_add_ons: state.subscriptionAddOns,
+          promo_code: state.promoCode,
+          amount_idr: totalAfterPromoIdr,
+        },
+      });
+    } catch (e) {
+      console.error("Audit log failed:", e);
+    }
+  };
+
   const startXenditInvoice = async () => {
     if (totalAfterPromoIdr == null) {
       toast({ variant: "destructive", title: t("order.totalNotAvailableTitle") });
@@ -372,6 +411,8 @@ export default function Payment() {
 
     setPaying(true);
     try {
+      await logOrderAudit();
+
       const res = await createXenditInvoice({
         amount_idr: totalAfterPromoIdr,
         subscription_years: state.subscriptionYears ?? 0,
