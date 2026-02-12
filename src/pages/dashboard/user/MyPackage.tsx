@@ -164,6 +164,20 @@ export default function MyPackage() {
   const [discountedMonthlyByPackageId, setDiscountedMonthlyByPackageId] = useState<Record<string, number>>({});
   const [savingDuration, setSavingDuration] = useState(false);
 
+  /** Max duration discount per package — for "Diskon Hingga" display (synced with /packages) */
+  const maxDiscountByPackageId = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const [pid, rows] of Object.entries(durationRowsByPackageId)) {
+      let maxDisc = 0;
+      for (const r of rows) {
+        const d = Number(r.discount_percent ?? 0);
+        if (Number.isFinite(d) && d > maxDisc) maxDisc = d;
+      }
+      if (maxDisc > 0) map[pid] = maxDisc;
+    }
+    return map;
+  }, [durationRowsByPackageId]);
+
   // Upgrade form: chosen duration per upgrade package card
   const [selectedUpgradeDurationByPackageId, setSelectedUpgradeDurationByPackageId] = useState<
     Record<string, number>
@@ -847,11 +861,53 @@ export default function MyPackage() {
                 </div>
 
                 <div className="pt-2">
-                  <div className="flex flex-col gap-3">
-                    <p className="text-2xl font-bold text-foreground">
-                      {formatIdr(resolvedMonthlyPrice)}
-                      <span className="text-sm font-normal text-muted-foreground"> /bulan</span>
-                    </p>
+                  {(() => {
+                    const pid = activePackageId;
+                    const n = (activePackage.packages.name ?? "").trim().toLowerCase();
+                    const t = (activePackage.packages.type ?? "").trim().toLowerCase();
+                    const isMonthlyBase = n === "growth" || n === "pro" || t === "growth" || t === "pro";
+                    const isGrowthOrPro = isMonthlyBase;
+
+                    const base = basePriceByPackageId[pid] ?? Number(activePackage.packages.price ?? 0);
+                    const discounted = discountedMonthlyByPackageId[pid];
+                    const discountPercent = maxDiscountByPackageId[pid] ?? 0;
+                    const hasPlan = base > 0 && discountPercent > 0;
+
+                    if (!hasPlan) {
+                      return (
+                        <p className="text-2xl font-bold text-foreground">
+                          {formatIdr(resolvedMonthlyPrice)}
+                          <span className="text-sm font-normal text-muted-foreground"> /bulan</span>
+                        </p>
+                      );
+                    }
+
+                    const normalDisplay = base;
+                    const headlineDisplay = discounted ?? Math.max(0, base * (1 - discountPercent / 100));
+                    const suffix = isMonthlyBase ? "/bulan" : "/ tahun";
+                    const normalLabel = isMonthlyBase
+                      ? `Harga Normal / Bulan: ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`
+                      : `Harga Normal / tahun: Rp ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
+
+                    return (
+                      <div className="text-center space-y-2">
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-sm font-semibold text-primary">
+                            {isGrowthOrPro ? "Diskon Hingga" : "Diskon"}
+                          </span>
+                          <span className="text-3xl md:text-4xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
+                        </div>
+                        <div className="text-sm text-muted-foreground line-through">{normalLabel}</div>
+                        <div className="text-4xl font-bold text-foreground">
+                          Rp {headlineDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                          <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">{suffix}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {isMonthlyBase ? "Harga setelah diskon / bulan" : "Harga / tahun setelah diskon"}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                     <div className="grid gap-2">
                       <div className="flex flex-wrap items-center gap-2">
@@ -896,7 +952,6 @@ export default function MyPackage() {
                         </p>
                       )}
                     </div>
-                  </div>
                 </div>
 
                 {/* Action button (changes by status) */}
@@ -1021,10 +1076,53 @@ export default function MyPackage() {
                           <CardDescription className="mt-1">{pkg.description}</CardDescription>
                         </div>
 
-                <div className="text-right shrink-0">
-                          <div className="font-bold text-foreground text-xl leading-none">{formatIdr(discountedMonthlyByPackageId[String(pkg.id)] ?? basePriceByPackageId[String(pkg.id)] ?? pkg.price)}</div>
-                          <div className="text-xs text-muted-foreground">/bulan</div>
-                        </div>
+                {(() => {
+                  const pid = String(pkg.id);
+                  const n = (pkg.name ?? "").trim().toLowerCase();
+                  const t = (pkg.type ?? "").trim().toLowerCase();
+                  const isMonthlyBase = n === "growth" || n === "pro" || t === "growth" || t === "pro";
+                  const isGrowthOrPro = isMonthlyBase;
+
+                  const base = basePriceByPackageId[pid] ?? Number(pkg.price ?? 0);
+                  const discounted = discountedMonthlyByPackageId[pid];
+                  const discountPercent = maxDiscountByPackageId[pid] ?? 0;
+                  const hasPlan = base > 0 && discountPercent > 0;
+
+                  if (!hasPlan) {
+                    return (
+                      <div className="text-right shrink-0">
+                        <div className="font-bold text-foreground text-xl leading-none">{formatIdr(base)}</div>
+                        <div className="text-xs text-muted-foreground">/bulan</div>
+                      </div>
+                    );
+                  }
+
+                  const normalDisplay = base;
+                  const headlineDisplay = discounted ?? Math.max(0, base * (1 - discountPercent / 100));
+                  const suffix = isMonthlyBase ? "/bulan" : "/ tahun";
+                  const normalLabel = isMonthlyBase
+                    ? `Harga Normal / Bulan: ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`
+                    : `Harga Normal / tahun: Rp ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
+
+                  return (
+                    <div className="text-center w-full space-y-2 mt-2">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-sm font-semibold text-primary">
+                          {isGrowthOrPro ? "Diskon Hingga" : "Diskon"}
+                        </span>
+                        <span className="text-3xl md:text-4xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground line-through">{normalLabel}</div>
+                      <div className="text-4xl font-bold text-foreground">
+                        Rp {headlineDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                        <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">{suffix}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {isMonthlyBase ? "Harga setelah diskon / bulan" : "Harga / tahun setelah diskon"}
+                      </div>
+                    </div>
+                  );
+                })()}
                       </div>
                     </CardHeader>
 
