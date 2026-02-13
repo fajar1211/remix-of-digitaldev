@@ -228,11 +228,22 @@ export default function SuperAdminUsersAssists() {
   const handleSetExpired = async () => {
     if (!expireTarget) return;
     try {
+      const now = new Date().toISOString();
+      // 1) Update profile status
       const { error } = await supabase
         .from("profiles")
-        .update({ account_status: "expired" as any, payment_active: false, updated_at: new Date().toISOString() })
+        .update({ account_status: "expired" as any, payment_active: false, updated_at: now })
         .eq("id", expireTarget.id);
       if (error) throw error;
+
+      // 2) Update user_packages.expires_at to now for the user's latest package
+      const { error: pkgError } = await supabase
+        .from("user_packages")
+        .update({ expires_at: now } as any)
+        .eq("user_id", expireTarget.id)
+        .in("status", ["active", "pending", "approved"]);
+      if (pkgError) console.warn("Failed to update user_packages.expires_at:", pkgError);
+
       toast.success(`${expireTarget.name || expireTarget.email} marked as Expired`);
       setExpireTarget(null);
       fetchAccounts();
