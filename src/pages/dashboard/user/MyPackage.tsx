@@ -860,7 +860,7 @@ export default function MyPackage() {
                   )}
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-2 space-y-4">
                   {(() => {
                     const pid = activePackageId;
                     const n = (activePackage.packages.name ?? "").trim().toLowerCase();
@@ -888,23 +888,24 @@ export default function MyPackage() {
                     const normalLabel = isMonthlyBase
                       ? `Harga Normal / Bulan: ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`
                       : `Harga Normal / tahun: Rp ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
+                    const afterLabel = isMonthlyBase
+                      ? "Harga setelah diskon / bulan"
+                      : "Harga / tahun setelah diskon";
 
                     return (
-                      <div className="text-center space-y-2">
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="text-sm font-semibold text-primary">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-primary">
                             {isGrowthOrPro ? "Diskon Hingga" : "Diskon"}
                           </span>
-                          <span className="text-3xl md:text-4xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
+                          <span className="text-2xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
                         </div>
-                        <div className="text-sm text-muted-foreground line-through">{normalLabel}</div>
-                        <div className="text-4xl font-bold text-foreground">
+                        <p className="text-xs text-muted-foreground line-through">{normalLabel}</p>
+                        <p className="text-2xl font-bold text-foreground">
                           Rp {headlineDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
-                          <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">{suffix}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {isMonthlyBase ? "Harga setelah diskon / bulan" : "Harga / tahun setelah diskon"}
-                        </div>
+                          <span className="ml-1 text-sm font-medium text-muted-foreground">{suffix}</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">{afterLabel}</p>
                       </div>
                     );
                   })()}
@@ -955,7 +956,20 @@ export default function MyPackage() {
                 </div>
 
                 {/* Action button (changes by status) */}
-                {statusSource === "approved" ? (
+                {statusSource === "pending" ? (
+                  <div className="pt-2">
+                    <Button className="w-full" onClick={() => {
+                      const t = normalizeTier(activePackage.packages.type ?? activePackage.packages.name);
+                      if (t === "starter" || t.includes("website")) {
+                        navigate("/order/choose-domain");
+                      } else {
+                        navigate("/order/select-plan");
+                      }
+                    }}>
+                      Pay Now
+                    </Button>
+                  </div>
+                ) : statusSource === "approved" ? (
                   <div className="pt-2">
                     <Button className="w-full" onClick={() => {
                       const t = normalizeTier(activePackage.packages.type ?? activePackage.packages.name);
@@ -1105,21 +1119,21 @@ export default function MyPackage() {
                     : `Harga Normal / tahun: Rp ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
 
                   return (
-                    <div className="text-center w-full space-y-2 mt-2">
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="text-sm font-semibold text-primary">
+                    <div className="w-full space-y-1.5 mt-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-primary">
                           {isGrowthOrPro ? "Diskon Hingga" : "Diskon"}
                         </span>
-                        <span className="text-3xl md:text-4xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
+                        <span className="text-2xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
                       </div>
-                      <div className="text-sm text-muted-foreground line-through">{normalLabel}</div>
-                      <div className="text-4xl font-bold text-foreground">
+                      <p className="text-xs text-muted-foreground line-through">{normalLabel}</p>
+                      <p className="text-xl font-bold text-foreground">
                         Rp {headlineDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
-                        <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">{suffix}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
+                        <span className="ml-1 text-sm font-medium text-muted-foreground">{suffix}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
                         {isMonthlyBase ? "Harga setelah diskon / bulan" : "Harga / tahun setelah diskon"}
-                      </div>
+                      </p>
                     </div>
                   );
                 })()}
