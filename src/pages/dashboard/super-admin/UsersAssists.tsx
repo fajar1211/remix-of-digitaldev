@@ -3,8 +3,18 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RefreshCcw } from "lucide-react";
@@ -35,93 +45,75 @@ type AccountRow = {
 type SortKey = "name" | "email" | "role" | "account_status";
 type SortDir = "asc" | "desc";
 
-type RoleFilter = "all" | "user" | "assistant" | "super_admin";
-type StatusFilter = "all" | string;
+const normalizeRole = (role: string) => {
+  const r = String(role ?? "").toLowerCase().trim();
+  if (r === "assist") return "assistant";
+  if (r === "super admin") return "super_admin";
+  return r;
+};
+
+const formatStatusLabel = (status: string) => {
+  const s = String(status ?? "").toLowerCase().trim();
+  if (s === "active") return "Active";
+  if (s === "approved") return "Approved";
+  if (s === "pending") return "Pending";
+  if (s === "suspended" || s === "inactive" || s === "nonactive" || s === "blacklisted") return "Suspended";
+  if (s === "expired") return "Expired";
+  return "—";
+};
+
+const userStatusBadgeVariant = (
+  status: string,
+): "success" | "secondary" | "warning" | "destructive" | "muted" | "outline" => {
+  const s = String(status ?? "").toLowerCase().trim();
+  if (s === "active") return "success";
+  if (s === "approved") return "secondary";
+  if (s === "pending") return "warning";
+  if (s === "expired") return "muted";
+  if (s === "suspended" || s === "inactive" || s === "nonactive" || s === "blacklisted") return "destructive";
+  return "outline";
+};
+
+const normalizeAccountStatus = (status: string) => {
+  const s = String(status ?? "").toLowerCase().trim();
+  if (s === "inactive") return "nonactive";
+  if (s === "") return "pending";
+  return s;
+};
+
+const getAccountStatus = (row: Pick<AccountRow, "role" | "paymentActive" | "accountStatus">) => {
+  const role = normalizeRole(row.role);
+  if (role !== "assistant" && row.paymentActive) return "active";
+  const s = normalizeAccountStatus(row.accountStatus);
+  if (role === "assistant") {
+    if (s === "active" || s === "pending" || s === "nonactive") return s;
+    return "nonactive";
+  }
+  return s;
+};
+
+const renderStatusBadge = (status: string, role: string) => {
+  if (normalizeRole(role) === "assistant") {
+    const label = formatAssistStatusLabel(status);
+    if (label === "—") return <span className="text-muted-foreground">—</span>;
+    return <Badge variant={assistStatusBadgeVariant(status)}>{label}</Badge>;
+  }
+  const label = formatStatusLabel(status);
+  if (label === "—") return <span className="text-muted-foreground">—</span>;
+  return <Badge variant={userStatusBadgeVariant(status)}>{label}</Badge>;
+};
+
+const canLoginAs = (role: string) => normalizeRole(role) !== "super_admin";
 
 export default function SuperAdminUsersAssists() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<AccountRow[]>([]);
-
-  const [sortKey, setSortKey] = useState<SortKey>("role");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [activeTab, setActiveTab] = useState("user");
 
-  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
-  const normalizeRole = (role: string) => {
-    const r = String(role ?? "").toLowerCase().trim();
-    if (r === "assist") return "assistant";
-    if (r === "super admin") return "super_admin";
-    return r;
-  };
-
-  const formatStatusLabel = (status: string) => {
-    const s = String(status ?? "").toLowerCase().trim();
-    if (s === "active") return "Active";
-    if (s === "approved") return "Approved";
-    if (s === "pending") return "Pending";
-    if (s === "suspended" || s === "inactive" || s === "nonactive" || s === "blacklisted") return "Suspended";
-    if (s === "expired") return "Expired";
-    if (s === "pending") return "Pending";
-    return "—";
-  };
-
-  const userStatusBadgeVariant = (
-    status: string,
-  ): "success" | "secondary" | "warning" | "destructive" | "muted" | "outline" => {
-    const s = String(status ?? "").toLowerCase().trim();
-    if (s === "active") return "success";
-    if (s === "approved") return "secondary";
-    if (s === "pending") return "warning";
-    if (s === "expired") return "muted";
-    if (s === "suspended" || s === "inactive" || s === "nonactive" || s === "blacklisted") return "destructive";
-    return "outline";
-  };
-
-  const normalizeAccountStatus = (status: string) => {
-    const s = String(status ?? "").toLowerCase().trim();
-    // Back-compat with previous values
-    if (s === "inactive") return "nonactive";
-    if (s === "") return "pending";
-    return s;
-  };
-
-  const getAccountStatus = (row: Pick<AccountRow, "role" | "paymentActive" | "accountStatus">) => {
-    const role = normalizeRole(row.role);
-    // NOTE:
-    // - For assistants, status should strictly follow profiles.account_status
-    //   so the admin "set nonactive" action works reliably.
-    // - For users, payment_active=true still implies Active access.
-    if (role !== "assistant" && row.paymentActive) return "active";
-
-    const s = normalizeAccountStatus(row.accountStatus);
-
-    // For assistants we only care about active/nonactive/pending.
-    if (role === "assistant") {
-      if (s === "active" || s === "pending" || s === "nonactive") return s;
-      // Treat suspended/blacklisted/expired/etc as nonactive for assistant UI.
-      return "nonactive";
-    }
-
-    return s;
-  };
-
-  const renderStatusBadge = (status: string, role: string) => {
-    if (normalizeRole(role) === "assistant") {
-      const label = formatAssistStatusLabel(status);
-      if (label === "—") return <span className="text-muted-foreground">—</span>;
-      return <Badge variant={assistStatusBadgeVariant(status)}>{label}</Badge>;
-    }
-
-    const label = formatStatusLabel(status);
-    if (label === "—") return <span className="text-muted-foreground">—</span>;
-    return <Badge variant={userStatusBadgeVariant(status)}>{label}</Badge>;
-  };
-
-  const canLoginAs = (role: string) => {
-    // Super Admin accounts should not be impersonated from this list.
-    return normalizeRole(role) !== "super_admin";
-  };
+  // Expired confirmation dialog state
+  const [expireTarget, setExpireTarget] = useState<AccountRow | null>(null);
 
   const fetchAccounts = async () => {
     setLoading(true);
@@ -148,7 +140,6 @@ export default function SuperAdminUsersAssists() {
           email: String(p.email ?? ""),
           role,
           accountStatus: String((p as any).account_status ?? "pending"),
-          // IMPORTANT: default must be false so new users don't appear Active.
           paymentActive: Boolean((p as any).payment_active ?? false),
         };
       });
@@ -166,64 +157,36 @@ export default function SuperAdminUsersAssists() {
     fetchAccounts();
   }, []);
 
-  const filtered = useMemo(() => {
+  const filteredByRole = useMemo(() => {
     return rows.filter((r) => {
-      if (roleFilter !== "all" && normalizeRole(r.role) !== roleFilter) return false;
-      if (statusFilter !== "all") {
-        const s = String(getAccountStatus(r) ?? "").toLowerCase().trim();
-        if (s !== String(statusFilter).toLowerCase().trim()) return false;
-      }
+      const role = normalizeRole(r.role);
+      if (activeTab === "user") return role === "user";
+      if (activeTab === "assistant") return role === "assistant";
+      if (activeTab === "admin") return role === "admin";
+      if (activeTab === "super_admin") return role === "super_admin";
       return true;
     });
-  }, [roleFilter, rows, statusFilter]);
-
-  const statusOptions = useMemo(() => {
-    // Build options from the current role-filtered dataset (before status filtering)
-    const base = rows.filter((r) => (roleFilter === "all" ? true : normalizeRole(r.role) === roleFilter));
-    const map = new Map<string, string>();
-
-    base.forEach((r) => {
-      const raw = String(getAccountStatus(r) ?? "").toLowerCase().trim();
-      if (!raw) return;
-      const label =
-        normalizeRole(r.role) === "assistant" ? formatAssistStatusLabel(raw) : formatStatusLabel(raw);
-      if (label === "—") return;
-      // Keep first label found for a raw status
-      if (!map.has(raw)) map.set(raw, label);
-    });
-
-    return Array.from(map.entries())
-      .map(([value, label]) => ({ value, label }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [roleFilter, rows]);
-
-  useEffect(() => {
-    if (statusFilter === "all") return;
-    const current = String(statusFilter).toLowerCase().trim();
-    const exists = statusOptions.some((o) => o.value === current);
-    if (!exists) setStatusFilter("all");
-  }, [statusFilter, statusOptions]);
+  }, [rows, activeTab]);
 
   const sorted = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;
-    return [...filtered].sort((a, b) => {
+    return [...filteredByRole].sort((a, b) => {
       const getSortValue = (row: AccountRow) => {
-          if (sortKey === "account_status") {
-            const status = getAccountStatus(row);
-            const label =
-              normalizeRole(row.role) === "assistant" ? formatAssistStatusLabel(status) : formatStatusLabel(status);
-            return label.toLowerCase();
-          }
+        if (sortKey === "account_status") {
+          const status = getAccountStatus(row);
+          const label =
+            normalizeRole(row.role) === "assistant" ? formatAssistStatusLabel(status) : formatStatusLabel(status);
+          return label.toLowerCase();
+        }
         return String((row as any)[sortKey] ?? "").toLowerCase();
       };
-
       const av = getSortValue(a);
       const bv = getSortValue(b);
       if (av < bv) return -1 * dir;
       if (av > bv) return 1 * dir;
       return 0;
     });
-  }, [filtered, sortDir, sortKey]);
+  }, [filteredByRole, sortDir, sortKey]);
 
   const toggleSort = (key: SortKey) => {
     setSortKey((prevKey) => {
@@ -248,9 +211,6 @@ export default function SuperAdminUsersAssists() {
       if (!actionLink) throw new Error("Missing action_link");
       if (!redirectTo) throw new Error("Missing redirect_to");
 
-      // NOTE: Supabase magic-link sometimes falls back to SITE_URL (e.g. localhost) on the verify URL.
-      // To ensure we land on the correct dashboard, we verify the magiclink token ourselves on a local route,
-      // then redirect to the provided redirect_to.
       const token = new URL(actionLink).searchParams.get("token");
       if (!token) throw new Error("Missing token in action_link");
 
@@ -264,6 +224,89 @@ export default function SuperAdminUsersAssists() {
       toast.error(e?.message || "Failed to generate login link");
     }
   };
+
+  const handleSetExpired = async () => {
+    if (!expireTarget) return;
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ account_status: "expired" as any, payment_active: false, updated_at: new Date().toISOString() })
+        .eq("id", expireTarget.id);
+      if (error) throw error;
+      toast.success(`${expireTarget.name || expireTarget.email} marked as Expired`);
+      setExpireTarget(null);
+      fetchAccounts();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || "Failed to update status");
+    }
+  };
+
+  const roleCounts = useMemo(() => {
+    const counts = { user: 0, assistant: 0, admin: 0, super_admin: 0 };
+    for (const r of rows) {
+      const role = normalizeRole(r.role);
+      if (role in counts) counts[role as keyof typeof counts]++;
+    }
+    return counts;
+  }, [rows]);
+
+  const renderSortableHead = (key: SortKey, label: string) => (
+    <TableHead>
+      <button
+        type="button"
+        onClick={() => toggleSort(key)}
+        className="inline-flex items-center gap-2 hover:underline"
+      >
+        {label}
+        {sortKey === key ? <span className="text-xs">{sortDir === "asc" ? "▲" : "▼"}</span> : null}
+      </button>
+    </TableHead>
+  );
+
+  const renderTable = (showExpireAction: boolean) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          {renderSortableHead("name", "Name")}
+          {renderSortableHead("email", "Email")}
+          {renderSortableHead("account_status", "Status")}
+          <TableHead className="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sorted.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={4} className="text-muted-foreground">
+              No accounts found.
+            </TableCell>
+          </TableRow>
+        ) : (
+          sorted.map((r) => (
+            <TableRow key={r.id}>
+              <TableCell className="font-medium">{r.name}</TableCell>
+              <TableCell>{r.email}</TableCell>
+              <TableCell>{renderStatusBadge(getAccountStatus(r), r.role)}</TableCell>
+              <TableCell className="text-right space-x-2">
+                {showExpireAction && getAccountStatus(r) !== "expired" && (
+                  <Button size="sm" variant="destructive" onClick={() => setExpireTarget(r)}>
+                    Set Expired
+                  </Button>
+                )}
+                {canLoginAs(r.role) ? (
+                  <Button size="sm" variant="outline" onClick={() => openLoginAs(r.id)}>
+                    Login as
+                  </Button>
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
+              </TableCell>
+            </TableRow>
+          ))
+        )}
+      </TableBody>
+    </Table>
+  );
 
   return (
     <div className="space-y-6">
@@ -280,105 +323,46 @@ export default function SuperAdminUsersAssists() {
       </div>
 
       <Card>
-        <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <CardHeader>
           <CardTitle>Accounts</CardTitle>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <div className="w-full sm:w-56">
-              <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as RoleFilter)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter role" />
-                </SelectTrigger>
-                <SelectContent className="z-50 bg-popover">
-                  <SelectItem value="all">All roles</SelectItem>
-                  <SelectItem value="user">User</SelectItem>
-                  <SelectItem value="assistant">Assistant</SelectItem>
-                  <SelectItem value="super_admin">Super Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="w-full sm:w-56">
-              <Select value={String(statusFilter)} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter status" />
-                </SelectTrigger>
-                <SelectContent className="z-50 bg-popover">
-                  <SelectItem value="all">All statuses</SelectItem>
-                  {statusOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
             <p className="text-muted-foreground">Loading accounts...</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>
-                    <button
-                      type="button"
-                      onClick={() => toggleSort("role")}
-                      className="inline-flex items-center gap-2 hover:underline"
-                    >
-                      Role
-                      {sortKey === "role" ? <span className="text-xs">{sortDir === "asc" ? "▲" : "▼"}</span> : null}
-                    </button>
-                  </TableHead>
-                  <TableHead>
-                    <button
-                      type="button"
-                      onClick={() => toggleSort("account_status")}
-                      className="inline-flex items-center gap-2 hover:underline"
-                    >
-                      Status
-                      {sortKey === "account_status" ? (
-                        <span className="text-xs">{sortDir === "asc" ? "▲" : "▼"}</span>
-                      ) : null}
-                    </button>
-                  </TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sorted.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-muted-foreground">
-                      No accounts found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  sorted.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.name}</TableCell>
-                      <TableCell>{r.email}</TableCell>
-                      <TableCell className="capitalize">{r.role.replace("_", " ")}</TableCell>
-                      <TableCell>{renderStatusBadge(getAccountStatus(r), r.role)}</TableCell>
-                      <TableCell className="text-right">
-                        {canLoginAs(r.role) ? (
-                          <Button size="sm" variant="outline" onClick={() => openLoginAs(r.id)}>
-                            Login as
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="mb-4">
+                <TabsTrigger value="user">User ({roleCounts.user})</TabsTrigger>
+                <TabsTrigger value="assistant">Assistant ({roleCounts.assistant})</TabsTrigger>
+                <TabsTrigger value="admin">Admin ({roleCounts.admin})</TabsTrigger>
+                <TabsTrigger value="super_admin">Super Admin ({roleCounts.super_admin})</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="user">{renderTable(true)}</TabsContent>
+              <TabsContent value="assistant">{renderTable(false)}</TabsContent>
+              <TabsContent value="admin">{renderTable(false)}</TabsContent>
+              <TabsContent value="super_admin">{renderTable(false)}</TabsContent>
+            </Tabs>
           )}
         </CardContent>
       </Card>
+
+      {/* Confirm Expired Dialog */}
+      <AlertDialog open={!!expireTarget} onOpenChange={(open) => !open && setExpireTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Set account as Expired?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to mark <strong>{expireTarget?.name || expireTarget?.email}</strong> as Expired?
+              This will deactivate their payment status.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSetExpired}>Yes, Set Expired</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
