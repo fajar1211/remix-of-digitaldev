@@ -281,6 +281,7 @@ export default function MyPackage() {
 
         // Load duration rules for ALL available packages (so Upgrade Options matches onboarding too)
         const pkgIds = mappedPkgs.map((p) => String(p.id)).filter(Boolean);
+        const durationGrouped: Record<string, PackageDurationRow[]> = {};
         if (pkgIds.length > 0) {
           const { data: durationRows, error: durationError } = await (supabase as any)
             .from("package_durations")
@@ -294,11 +295,10 @@ export default function MyPackage() {
             console.warn("Failed to load package durations:", durationError);
           }
 
-          const grouped: Record<string, PackageDurationRow[]> = {};
           ((durationRows as any[]) || []).forEach((r) => {
             const pid = String(r.package_id);
-            if (!grouped[pid]) grouped[pid] = [];
-            grouped[pid].push({
+            if (!durationGrouped[pid]) durationGrouped[pid] = [];
+            durationGrouped[pid].push({
               id: String(r.id),
               package_id: pid,
               duration_months: Number(r.duration_months ?? 1),
@@ -308,7 +308,7 @@ export default function MyPackage() {
             });
           });
 
-          setDurationRowsByPackageId((prev) => ({ ...prev, ...grouped }));
+          setDurationRowsByPackageId((prev) => ({ ...prev, ...durationGrouped }));
         }
 
         // Fetch subscription plans from website_settings for ALL packages (synced with duration-packages admin)
@@ -357,20 +357,33 @@ export default function MyPackage() {
         const discountedMap: Record<string, number> = {};
         for (const pid of pkgIds) {
           const plans = plansGrouped[pid];
-          if (plans && plans.length > 0) {
-            // Determine which plan year to use — mirrors /packages logic
-            const matchedPkg = mappedPkgs.find((p) => String(p.id) === pid);
-            const pName = (matchedPkg?.name ?? "").trim().toLowerCase();
-            const pType = (matchedPkg?.type ?? "").trim().toLowerCase();
-            const isMonthlyBase = pName === "growth" || pName === "pro" || pType === "growth" || pType === "pro";
-            const yearsWanted = isMonthlyBase ? 3 : 1;
+          const matchedPkg = mappedPkgs.find((p) => String(p.id) === pid);
+          const pName = (matchedPkg?.name ?? "").trim().toLowerCase();
+          const pType = (matchedPkg?.type ?? "").trim().toLowerCase();
+          const isMonthlyBase = pName === "growth" || pName === "pro" || pType === "growth" || pType === "pro";
 
+          if (plans && plans.length > 0) {
+            const yearsWanted = isMonthlyBase ? 3 : 1;
             const planRow = plans.find((p) => p.years === yearsWanted) ?? plans.find((p) => p.years === 1) ?? plans[0];
             if (planRow && planRow.base_price_idr > 0) {
               basePriceMap[pid] = planRow.base_price_idr;
-              // Compute discounted monthly price same as /packages headline
               const disc = Number(planRow.discount_percent ?? 0);
               discountedMap[pid] = Math.max(0, planRow.base_price_idr * (1 - disc / 100));
+            }
+          } else {
+            // Fallback: use packages.price + max discount from package_durations
+            // This mirrors /packages page logic when no per-package subscription plans exist
+            const pkgPrice = Number(matchedPkg?.price ?? 0);
+            if (pkgPrice > 0) {
+              basePriceMap[pid] = pkgPrice;
+              // Get max discount from already-loaded duration rows
+              const durRows = durationGrouped[pid] ?? [];
+              let maxDisc = 0;
+              for (const dr of durRows) {
+                const d = Number(dr.discount_percent ?? 0);
+                if (Number.isFinite(d) && d > maxDisc) maxDisc = d;
+              }
+              discountedMap[pid] = maxDisc > 0 ? Math.max(0, pkgPrice * (1 - maxDisc / 100)) : pkgPrice;
             }
           }
         }
@@ -1079,7 +1092,7 @@ export default function MyPackage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <CardTitle className="text-lg truncate">{pkg.name}</CardTitle>
+                            <CardTitle className="text-lg break-words whitespace-normal">{pkg.name}</CardTitle>
                             {isRecommended && (
                               <Badge className="bg-primary text-primary-foreground">
                                 <Star className="h-3 w-3 mr-1" />

@@ -6,6 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -15,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RefreshCcw } from "lucide-react";
@@ -112,8 +121,13 @@ export default function SuperAdminUsersAssists() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [activeTab, setActiveTab] = useState("user");
 
-  // Expired confirmation dialog state
+  // Expired confirmation dialog state (simple expire without date)
   const [expireTarget, setExpireTarget] = useState<AccountRow | null>(null);
+
+  // Calendar-based expire dialog state
+  const [calendarTarget, setCalendarTarget] = useState<AccountRow | null>(null);
+  const [calendarDate, setCalendarDate] = useState<Date | undefined>(undefined);
+  const [savingExpire, setSavingExpire] = useState(false);
 
   const fetchAccounts = async () => {
     setLoading(true);
@@ -225,6 +239,58 @@ export default function SuperAdminUsersAssists() {
     }
   };
 
+  // Open calendar dialog for setting expire date
+  const openExpireCalendar = async (target: AccountRow) => {
+    // Fetch current expires_at from user_packages
+    try {
+      const { data: upRow } = await (supabase as any)
+        .from("user_packages")
+        .select("expires_at")
+        .eq("user_id", target.id)
+        .order("created_at", { ascending: false })
+        .maybeSingle();
+
+      const existing = upRow?.expires_at ? new Date(upRow.expires_at) : undefined;
+      setCalendarDate(existing && !isNaN(existing.getTime()) ? existing : undefined);
+    } catch {
+      setCalendarDate(undefined);
+    }
+    setCalendarTarget(target);
+  };
+
+  const handleSaveExpireDate = async () => {
+    if (!calendarTarget || !calendarDate) return;
+    setSavingExpire(true);
+    try {
+      // Update user_packages.expires_at
+      const { error: upError } = await (supabase as any)
+        .from("user_packages")
+        .update({ expires_at: calendarDate.toISOString() })
+        .eq("user_id", calendarTarget.id);
+
+      if (upError) throw upError;
+
+      // Also set account status to expired + payment_active=false if the date is in the past
+      const isPast = calendarDate.getTime() < Date.now();
+      if (isPast) {
+        await supabase
+          .from("profiles")
+          .update({ account_status: "expired" as any, payment_active: false, updated_at: new Date().toISOString() })
+          .eq("id", calendarTarget.id);
+      }
+
+      toast.success(`Expire date set for ${calendarTarget.name || calendarTarget.email}`);
+      setCalendarTarget(null);
+      setCalendarDate(undefined);
+      fetchAccounts();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || "Failed to update expire date");
+    } finally {
+      setSavingExpire(false);
+    }
+  };
+
   const handleSetExpired = async () => {
     if (!expireTarget) return;
     try {
@@ -288,9 +354,9 @@ export default function SuperAdminUsersAssists() {
               <TableCell>{r.email}</TableCell>
               <TableCell>{renderStatusBadge(getAccountStatus(r), r.role)}</TableCell>
               <TableCell className="text-right space-x-2">
-                {showExpireAction && getAccountStatus(r) !== "expired" && (
-                  <Button size="sm" variant="destructive" onClick={() => setExpireTarget(r)}>
-                    Set Expired
+                {showExpireAction && (
+                  <Button size="sm" variant="destructive" onClick={() => openExpireCalendar(r)}>
+                    Set Expire
                   </Button>
                 )}
                 {canLoginAs(r.role) ? (
@@ -347,7 +413,40 @@ export default function SuperAdminUsersAssists() {
         </CardContent>
       </Card>
 
-      {/* Confirm Expired Dialog */}
+      {/* Calendar Expire Date Dialog */}
+      <Dialog open={!!calendarTarget} onOpenChange={(open) => { if (!open) { setCalendarTarget(null); setCalendarDate(undefined); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Set Expire Date</DialogTitle>
+            <DialogDescription>
+              Choose an expiration date for <strong>{calendarTarget?.name || calendarTarget?.email}</strong>'s package.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center py-4">
+            <Calendar
+              mode="single"
+              selected={calendarDate}
+              onSelect={setCalendarDate}
+              className="rounded-md border pointer-events-auto"
+            />
+          </div>
+          {calendarDate && (
+            <p className="text-sm text-center text-muted-foreground">
+              Selected: <span className="font-medium text-foreground">{calendarDate.toLocaleDateString("en-GB")}</span>
+            </p>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => { setCalendarTarget(null); setCalendarDate(undefined); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveExpireDate} disabled={!calendarDate || savingExpire}>
+              {savingExpire ? "Saving..." : "Save Expire Date"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Expired Dialog (legacy fallback) */}
       <AlertDialog open={!!expireTarget} onOpenChange={(open) => !open && setExpireTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
