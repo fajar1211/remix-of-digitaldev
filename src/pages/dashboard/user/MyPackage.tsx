@@ -311,80 +311,21 @@ export default function MyPackage() {
           setDurationRowsByPackageId((prev) => ({ ...prev, ...durationGrouped }));
         }
 
-        // Fetch subscription plans from website_settings for ALL packages (synced with duration-packages admin)
-        const plansGrouped: Record<string, SubscriptionPlanRow[]> = {};
-        for (const pid of pkgIds) {
-          try {
-            const key = getSubscriptionPlansKey(pid);
-            const { data: row } = await (supabase as any)
-              .from("website_settings")
-              .select("value")
-              .eq("key", key)
-              .maybeSingle();
-
-            const v = row?.value ?? (
-              key !== SETTINGS_SUBSCRIPTION_PLANS_KEY
-                ? (
-                    await (supabase as any)
-                      .from("website_settings")
-                      .select("value")
-                      .eq("key", SETTINGS_SUBSCRIPTION_PLANS_KEY)
-                      .maybeSingle()
-                  )?.data?.value
-                : undefined
-            );
-
-            if (Array.isArray(v)) {
-              plansGrouped[pid] = (v as any[])
-                .filter((r: any) => r?.is_active !== false && Number(r?.years) > 0)
-                .map((r: any) => ({
-                  years: Number(r.years),
-                  label: String(r.label ?? `${r.years} Year${r.years > 1 ? "s" : ""}`),
-                  price_usd: Number(r.price_usd ?? 0),
-                  base_price_idr: Number(r.base_price_idr ?? 0),
-                  discount_percent: Number(r.discount_percent ?? 0),
-                  is_active: r.is_active !== false,
-                }));
-            }
-          } catch {
-            // ignore per-package plan fetch errors
-          }
-        }
-        setPlansByPackageId(plansGrouped);
-
-        // Extract basePriceIdr for monthly display (synced with /packages page)
+        // Sync pricing directly from packages.price + package_durations (source of truth from duration-packages admin)
         const basePriceMap: Record<string, number> = {};
         const discountedMap: Record<string, number> = {};
         for (const pid of pkgIds) {
-          const plans = plansGrouped[pid];
           const matchedPkg = mappedPkgs.find((p) => String(p.id) === pid);
-          const pName = (matchedPkg?.name ?? "").trim().toLowerCase();
-          const pType = (matchedPkg?.type ?? "").trim().toLowerCase();
-          const isMonthlyBase = pName === "growth" || pName === "pro" || pType === "growth" || pType === "pro";
-
-          if (plans && plans.length > 0) {
-            const yearsWanted = isMonthlyBase ? 3 : 1;
-            const planRow = plans.find((p) => p.years === yearsWanted) ?? plans.find((p) => p.years === 1) ?? plans[0];
-            if (planRow && planRow.base_price_idr > 0) {
-              basePriceMap[pid] = planRow.base_price_idr;
-              const disc = Number(planRow.discount_percent ?? 0);
-              discountedMap[pid] = Math.max(0, planRow.base_price_idr * (1 - disc / 100));
+          const pkgPrice = Number(matchedPkg?.price ?? 0);
+          if (pkgPrice > 0) {
+            basePriceMap[pid] = pkgPrice;
+            const durRows = durationGrouped[pid] ?? [];
+            let maxDisc = 0;
+            for (const dr of durRows) {
+              const d = Number(dr.discount_percent ?? 0);
+              if (Number.isFinite(d) && d > maxDisc) maxDisc = d;
             }
-          } else {
-            // Fallback: use packages.price + max discount from package_durations
-            // This mirrors /packages page logic when no per-package subscription plans exist
-            const pkgPrice = Number(matchedPkg?.price ?? 0);
-            if (pkgPrice > 0) {
-              basePriceMap[pid] = pkgPrice;
-              // Get max discount from already-loaded duration rows
-              const durRows = durationGrouped[pid] ?? [];
-              let maxDisc = 0;
-              for (const dr of durRows) {
-                const d = Number(dr.discount_percent ?? 0);
-                if (Number.isFinite(d) && d > maxDisc) maxDisc = d;
-              }
-              discountedMap[pid] = maxDisc > 0 ? Math.max(0, pkgPrice * (1 - maxDisc / 100)) : pkgPrice;
-            }
+            discountedMap[pid] = maxDisc > 0 ? Math.max(0, pkgPrice * (1 - maxDisc / 100)) : pkgPrice;
           }
         }
         setBasePriceByPackageId(basePriceMap);
