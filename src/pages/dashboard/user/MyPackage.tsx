@@ -45,15 +45,6 @@ type SubscriptionPlanRow = {
   is_active: boolean;
 };
 
-type PlanMeta = {
-  years: number;
-  basePriceIdr: number;
-  discountPercent: number;
-  manualOverride: boolean;
-  overridePriceIdr: number | null;
-  finalPriceIdr: number | null;
-};
-
 interface UserPackage {
   id: string;
   package_id?: string;
@@ -171,8 +162,6 @@ export default function MyPackage() {
   const [basePriceByPackageId, setBasePriceByPackageId] = useState<Record<string, number>>({});
   /** Discounted monthly price per package — mirrors /packages headline logic */
   const [discountedMonthlyByPackageId, setDiscountedMonthlyByPackageId] = useState<Record<string, number>>({});
-  /** Full plan metadata per package — mirrors /packages (includes manualOverride etc.) */
-  const [planMetaByPackageId, setPlanMetaByPackageId] = useState<Record<string, PlanMeta>>({});
   const [savingDuration, setSavingDuration] = useState(false);
 
   /** Max duration discount per package — for "Diskon Hingga" display (synced with /packages) */
@@ -322,47 +311,29 @@ export default function MyPackage() {
           setDurationRowsByPackageId((prev) => ({ ...prev, ...grouped }));
         }
 
-        // Helper: parse plan metadata exactly as /packages does (supports manual overrides)
-        const parsePlanMeta = (value: unknown, yearsWanted: number): PlanMeta | null => {
-          const list = Array.isArray(value) ? (value as any[]) : [];
-          const row = list.find((r) => Number(r?.years) === Number(yearsWanted));
-          if (!row) return null;
-          const baseRaw = row?.base_price_idr;
-          const baseN = typeof baseRaw === "number" ? baseRaw : Number(baseRaw);
-          const discRaw = row?.discount_percent;
-          const discN = typeof discRaw === "number" ? discRaw : Number(discRaw);
-          const manualOverride = typeof row?.manual_override === "boolean" ? row.manual_override : false;
-          const overrideRaw = row?.override_price_idr;
-          const overrideN = overrideRaw === null || overrideRaw === undefined ? null : typeof overrideRaw === "number" ? overrideRaw : Number(overrideRaw);
-          const finalRaw = row?.final_price_idr ?? row?.price_usd;
-          const finalN = typeof finalRaw === "number" ? finalRaw : Number(finalRaw);
-          if (!Number.isFinite(baseN)) return null;
-          return {
-            years: Number(yearsWanted),
-            basePriceIdr: Math.max(0, baseN),
-            discountPercent: Number.isFinite(discN) ? discN : 0,
-            manualOverride,
-            overridePriceIdr: Number.isFinite(Number(overrideN)) ? Number(overrideN) : null,
-            finalPriceIdr: Number.isFinite(finalN) ? Math.max(0, finalN) : null,
-          };
-        };
-
         // Fetch subscription plans from website_settings for ALL packages (synced with duration-packages admin)
         const plansGrouped: Record<string, SubscriptionPlanRow[]> = {};
-        // Also fetch raw settings values for plan metadata
-        const settingsKeys = pkgIds.map((id) => `order_subscription_plans:${id}`);
-        const { data: settingsRows } = await (supabase as any).from("website_settings").select("key,value").in("key", [...settingsKeys, "order_subscription_plans"]);
-
-        const settingsByKey: Record<string, any> = {};
-        if (Array.isArray(settingsRows)) {
-          for (const r of settingsRows as any[]) settingsByKey[String(r?.key ?? "")] = r?.value;
-        }
-        const legacyGlobalPlans = settingsByKey["order_subscription_plans"];
-
         for (const pid of pkgIds) {
           try {
             const key = getSubscriptionPlansKey(pid);
-            const v = settingsByKey[key] ?? legacyGlobalPlans;
+            const { data: row } = await (supabase as any)
+              .from("website_settings")
+              .select("value")
+              .eq("key", key)
+              .maybeSingle();
+
+            const v = row?.value ?? (
+              key !== SETTINGS_SUBSCRIPTION_PLANS_KEY
+                ? (
+                    await (supabase as any)
+                      .from("website_settings")
+                      .select("value")
+                      .eq("key", SETTINGS_SUBSCRIPTION_PLANS_KEY)
+                      .maybeSingle()
+                  )?.data?.value
+                : undefined
+            );
+
             if (Array.isArray(v)) {
               plansGrouped[pid] = (v as any[])
                 .filter((r: any) => r?.is_active !== false && Number(r?.years) > 0)
@@ -381,41 +352,30 @@ export default function MyPackage() {
         }
         setPlansByPackageId(plansGrouped);
 
-        // Extract basePriceIdr + planMeta for display (synced with /packages page exactly)
+        // Extract basePriceIdr for monthly display (synced with /packages page)
         const basePriceMap: Record<string, number> = {};
         const discountedMap: Record<string, number> = {};
-        const planMetaMap: Record<string, PlanMeta> = {};
         for (const pid of pkgIds) {
-          const matchedPkg = mappedPkgs.find((p) => String(p.id) === pid);
-          const pName = (matchedPkg?.name ?? "").trim().toLowerCase();
-          const pType = (matchedPkg?.type ?? "").trim().toLowerCase();
-          const isMonthlyBase = pName === "growth" || pName === "pro" || pType === "growth" || pType === "pro";
-          const yearsWanted = isMonthlyBase ? 3 : 1;
+          const plans = plansGrouped[pid];
+          if (plans && plans.length > 0) {
+            // Determine which plan year to use — mirrors /packages logic
+            const matchedPkg = mappedPkgs.find((p) => String(p.id) === pid);
+            const pName = (matchedPkg?.name ?? "").trim().toLowerCase();
+            const pType = (matchedPkg?.type ?? "").trim().toLowerCase();
+            const isMonthlyBase = pName === "growth" || pName === "pro" || pType === "growth" || pType === "pro";
+            const yearsWanted = isMonthlyBase ? 3 : 1;
 
-          const key = getSubscriptionPlansKey(pid);
-          const rawValue = settingsByKey[key] ?? legacyGlobalPlans;
-          const meta = parsePlanMeta(rawValue, yearsWanted);
-          if (meta && meta.basePriceIdr > 0) {
-            planMetaMap[pid] = meta;
-            basePriceMap[pid] = meta.basePriceIdr;
-            // Compute discounted price same as /packages headline (respecting manual override)
-            const manualFinal = meta.manualOverride ? (meta.overridePriceIdr ?? meta.finalPriceIdr) : null;
-            if (typeof manualFinal === "number" && Number.isFinite(manualFinal)) {
-              discountedMap[pid] = Math.max(0, manualFinal);
-            } else {
-              const disc = Number(meta.discountPercent ?? 0);
-              if (isMonthlyBase) {
-                discountedMap[pid] = Math.max(0, meta.basePriceIdr * (1 - disc / 100));
-              } else {
-                const normalTotal = meta.basePriceIdr * meta.years;
-                discountedMap[pid] = Math.max(0, normalTotal * (1 - disc / 100));
-              }
+            const planRow = plans.find((p) => p.years === yearsWanted) ?? plans.find((p) => p.years === 1) ?? plans[0];
+            if (planRow && planRow.base_price_idr > 0) {
+              basePriceMap[pid] = planRow.base_price_idr;
+              // Compute discounted monthly price same as /packages headline
+              const disc = Number(planRow.discount_percent ?? 0);
+              discountedMap[pid] = Math.max(0, planRow.base_price_idr * (1 - disc / 100));
             }
           }
         }
         setBasePriceByPackageId(basePriceMap);
         setDiscountedMonthlyByPackageId(discountedMap);
-        setPlanMetaByPackageId(planMetaMap);
       }
 
       // Fetch add-ons for the current package + upgrade packages (Onboarding add-ons)
@@ -908,9 +868,9 @@ export default function MyPackage() {
                     const isMonthlyBase = n === "growth" || n === "pro" || t === "growth" || t === "pro";
                     const isGrowthOrPro = isMonthlyBase;
 
-                    const meta = planMetaByPackageId[pid];
-                    const base = meta?.basePriceIdr ?? basePriceByPackageId[pid] ?? Number(activePackage.packages.price ?? 0);
-                    const discountPercent = meta?.discountPercent ?? maxDiscountByPackageId[pid] ?? 0;
+                    const base = basePriceByPackageId[pid] ?? Number(activePackage.packages.price ?? 0);
+                    const discounted = discountedMonthlyByPackageId[pid];
+                    const discountPercent = maxDiscountByPackageId[pid] ?? 0;
                     const hasPlan = base > 0 && discountPercent > 0;
 
                     if (!hasPlan) {
@@ -922,36 +882,28 @@ export default function MyPackage() {
                       );
                     }
 
-                    const years = Math.max(1, meta?.years ?? 1);
-                    const manualFinal = meta?.manualOverride ? (meta.overridePriceIdr ?? meta.finalPriceIdr) : null;
-                    const normalDisplay = isMonthlyBase ? Math.max(0, base) : Math.max(0, base * years);
-                    const headlineDisplay =
-                      typeof manualFinal === "number" && Number.isFinite(manualFinal)
-                        ? Math.max(0, manualFinal)
-                        : isMonthlyBase
-                          ? Math.max(0, base * (1 - discountPercent / 100))
-                          : Math.max(0, normalDisplay * (1 - discountPercent / 100));
-
-                    const suffix = isMonthlyBase ? "/bulan" : years === 3 ? "/ 3 tahun" : "/ tahun";
-                    const afterLabel = isMonthlyBase
-                      ? "Harga setelah diskon / bulan"
-                      : years === 3 ? "Harga / 3 tahun setelah diskon" : "Harga / tahun setelah diskon";
+                    const normalDisplay = base;
+                    const headlineDisplay = discounted ?? Math.max(0, base * (1 - discountPercent / 100));
+                    const suffix = isMonthlyBase ? "/bulan" : "/ tahun";
                     const normalLabel = isMonthlyBase
                       ? `Harga Normal / Bulan: ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`
                       : `Harga Normal / tahun: Rp ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
+                    const afterLabel = isMonthlyBase
+                      ? "Harga setelah diskon / bulan"
+                      : "Harga / tahun setelah diskon";
 
                     return (
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-primary">
+                          <span className="text-xs font-semibold text-primary">
                             {isGrowthOrPro ? "Diskon Hingga" : "Diskon"}
                           </span>
-                          <span className="text-3xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
+                          <span className="text-2xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
                         </div>
-                        <p className="text-sm text-muted-foreground line-through">{normalLabel}</p>
+                        <p className="text-xs text-muted-foreground line-through">{normalLabel}</p>
                         <p className="text-2xl font-bold text-foreground">
                           Rp {headlineDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
-                          <span className="ml-2 text-sm font-medium text-muted-foreground">{suffix}</span>
+                          <span className="ml-1 text-sm font-medium text-muted-foreground">{suffix}</span>
                         </p>
                         <p className="text-xs text-muted-foreground">{afterLabel}</p>
                       </div>
@@ -1145,9 +1097,9 @@ export default function MyPackage() {
                   const isMonthlyBase = n === "growth" || n === "pro" || t === "growth" || t === "pro";
                   const isGrowthOrPro = isMonthlyBase;
 
-                  const meta = planMetaByPackageId[pid];
-                  const base = meta?.basePriceIdr ?? basePriceByPackageId[pid] ?? Number(pkg.price ?? 0);
-                  const discountPercent = meta?.discountPercent ?? maxDiscountByPackageId[pid] ?? 0;
+                  const base = basePriceByPackageId[pid] ?? Number(pkg.price ?? 0);
+                  const discounted = discountedMonthlyByPackageId[pid];
+                  const discountPercent = maxDiscountByPackageId[pid] ?? 0;
                   const hasPlan = base > 0 && discountPercent > 0;
 
                   if (!hasPlan) {
@@ -1159,38 +1111,29 @@ export default function MyPackage() {
                     );
                   }
 
-                  const years = Math.max(1, meta?.years ?? 1);
-                  const manualFinal = meta?.manualOverride ? (meta.overridePriceIdr ?? meta.finalPriceIdr) : null;
-                  const normalDisplay = isMonthlyBase ? Math.max(0, base) : Math.max(0, base * years);
-                  const headlineDisplay =
-                    typeof manualFinal === "number" && Number.isFinite(manualFinal)
-                      ? Math.max(0, manualFinal)
-                      : isMonthlyBase
-                        ? Math.max(0, base * (1 - discountPercent / 100))
-                        : Math.max(0, normalDisplay * (1 - discountPercent / 100));
-
-                  const suffix = isMonthlyBase ? "/bulan" : years === 3 ? "/ 3 tahun" : "/ tahun";
-                  const afterLabel = isMonthlyBase
-                    ? "Harga setelah diskon / bulan"
-                    : years === 3 ? "Harga / 3 tahun setelah diskon" : "Harga / tahun setelah diskon";
+                  const normalDisplay = base;
+                  const headlineDisplay = discounted ?? Math.max(0, base * (1 - discountPercent / 100));
+                  const suffix = isMonthlyBase ? "/bulan" : "/ tahun";
                   const normalLabel = isMonthlyBase
                     ? `Harga Normal / Bulan: ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`
                     : `Harga Normal / tahun: Rp ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
 
                   return (
-                    <div className="w-full space-y-2 mt-2">
+                    <div className="w-full space-y-1.5 mt-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-primary">
+                        <span className="text-xs font-semibold text-primary">
                           {isGrowthOrPro ? "Diskon Hingga" : "Diskon"}
                         </span>
-                        <span className="text-3xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
+                        <span className="text-2xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
                       </div>
-                      <p className="text-sm text-muted-foreground line-through">{normalLabel}</p>
+                      <p className="text-xs text-muted-foreground line-through">{normalLabel}</p>
                       <p className="text-xl font-bold text-foreground">
                         Rp {headlineDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
-                        <span className="ml-2 text-sm font-medium text-muted-foreground">{suffix}</span>
+                        <span className="ml-1 text-sm font-medium text-muted-foreground">{suffix}</span>
                       </p>
-                      <p className="text-xs text-muted-foreground">{afterLabel}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {isMonthlyBase ? "Harga setelah diskon / bulan" : "Harga / tahun setelah diskon"}
+                      </p>
                     </div>
                   );
                 })()}
