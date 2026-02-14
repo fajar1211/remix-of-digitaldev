@@ -127,6 +127,7 @@ export default function SuperAdminUsersAssists() {
   // Calendar-based expire dialog state
   const [calendarTarget, setCalendarTarget] = useState<AccountRow | null>(null);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(undefined);
+  const [calendarUserPackageId, setCalendarUserPackageId] = useState<string | null>(null);
   const [savingExpire, setSavingExpire] = useState(false);
 
   const fetchAccounts = async () => {
@@ -241,19 +242,20 @@ export default function SuperAdminUsersAssists() {
 
   // Open calendar dialog for setting expire date
   const openExpireCalendar = async (target: AccountRow) => {
-    // Fetch current expires_at from user_packages
     try {
       const { data: upRow } = await (supabase as any)
         .from("user_packages")
-        .select("expires_at")
+        .select("id, expires_at")
         .eq("user_id", target.id)
         .order("created_at", { ascending: false })
         .maybeSingle();
 
       const existing = upRow?.expires_at ? new Date(upRow.expires_at) : undefined;
       setCalendarDate(existing && !isNaN(existing.getTime()) ? existing : undefined);
+      setCalendarUserPackageId(upRow?.id ? String(upRow.id) : null);
     } catch {
       setCalendarDate(undefined);
+      setCalendarUserPackageId(null);
     }
     setCalendarTarget(target);
   };
@@ -262,13 +264,23 @@ export default function SuperAdminUsersAssists() {
     if (!calendarTarget || !calendarDate) return;
     setSavingExpire(true);
     try {
-      // Update user_packages.expires_at
-      const { error: upError } = await (supabase as any)
-        .from("user_packages")
-        .update({ expires_at: calendarDate.toISOString() })
-        .eq("user_id", calendarTarget.id);
+      if (calendarUserPackageId) {
+        // Update specific user_packages row by its primary key
+        const { error: upError } = await (supabase as any)
+          .from("user_packages")
+          .update({ expires_at: calendarDate.toISOString() })
+          .eq("id", calendarUserPackageId);
 
-      if (upError) throw upError;
+        if (upError) throw upError;
+      } else {
+        // Fallback: no user_packages row found, create or update by user_id
+        const { error: upError } = await (supabase as any)
+          .from("user_packages")
+          .update({ expires_at: calendarDate.toISOString() })
+          .eq("user_id", calendarTarget.id);
+
+        if (upError) throw upError;
+      }
 
       // Also set account status to expired + payment_active=false if the date is in the past
       const isPast = calendarDate.getTime() < Date.now();
@@ -282,6 +294,7 @@ export default function SuperAdminUsersAssists() {
       toast.success(`Expire date set for ${calendarTarget.name || calendarTarget.email}`);
       setCalendarTarget(null);
       setCalendarDate(undefined);
+      setCalendarUserPackageId(null);
       fetchAccounts();
     } catch (e: any) {
       console.error(e);
@@ -414,7 +427,7 @@ export default function SuperAdminUsersAssists() {
       </Card>
 
       {/* Calendar Expire Date Dialog */}
-      <Dialog open={!!calendarTarget} onOpenChange={(open) => { if (!open) { setCalendarTarget(null); setCalendarDate(undefined); } }}>
+      <Dialog open={!!calendarTarget} onOpenChange={(open) => { if (!open) { setCalendarTarget(null); setCalendarDate(undefined); setCalendarUserPackageId(null); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Set Expire Date</DialogTitle>
@@ -436,7 +449,7 @@ export default function SuperAdminUsersAssists() {
             </p>
           )}
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => { setCalendarTarget(null); setCalendarDate(undefined); }}>
+            <Button variant="outline" onClick={() => { setCalendarTarget(null); setCalendarDate(undefined); setCalendarUserPackageId(null); }}>
               Cancel
             </Button>
             <Button onClick={handleSaveExpireDate} disabled={!calendarDate || savingExpire}>
