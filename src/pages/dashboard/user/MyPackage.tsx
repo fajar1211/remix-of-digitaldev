@@ -178,6 +178,9 @@ export default function MyPackage() {
     return map;
   }, [durationRowsByPackageId]);
 
+  /** Headline discount percent per package — for starter it's from website_settings (1yr), for others it's max */
+  const [headlineDiscountByPackageId, setHeadlineDiscountByPackageId] = useState<Record<string, number>>({});
+
   // Upgrade form: chosen duration per upgrade package card
   const [selectedUpgradeDurationByPackageId, setSelectedUpgradeDurationByPackageId] = useState<
     Record<string, number>
@@ -312,10 +315,45 @@ export default function MyPackage() {
         }
 
         // Sync pricing directly from packages.price + package_durations (source of truth from duration-packages admin)
+        // For starter/Website Only packages, fetch base_price_idr from website_settings (since packages.price stores the discounted price)
         const basePriceMap: Record<string, number> = {};
         const discountedMap: Record<string, number> = {};
+        const headlineDiscMap: Record<string, number> = {};
         for (const pid of pkgIds) {
           const matchedPkg = mappedPkgs.find((p) => String(p.id) === pid);
+          const pType = (matchedPkg?.type ?? "").trim().toLowerCase();
+          const pName = (matchedPkg?.name ?? "").trim().toLowerCase();
+          const isStarter = pType === "starter" || pName.includes("website");
+
+          if (isStarter) {
+            // For Website Only: fetch base_price_idr from website_settings (super admin duration-packages)
+            try {
+              const settingsKey = `order_subscription_plans:${pid}`;
+              const { data: settingsRow } = await (supabase as any)
+                .from("website_settings")
+                .select("value")
+                .eq("key", settingsKey)
+                .maybeSingle();
+
+              const plans = Array.isArray(settingsRow?.value) ? settingsRow.value : [];
+              // Use 1-year plan for Website Only display
+              const yearPlan = plans.find((p: any) => Number(p.years) === 1) ?? plans[0];
+              if (yearPlan) {
+                const basePrice = Number(yearPlan.base_price_idr ?? 0);
+                const disc = Number(yearPlan.discount_percent ?? 0);
+                if (basePrice > 0) {
+                  basePriceMap[pid] = basePrice;
+                  discountedMap[pid] = Math.max(0, basePrice * (1 - disc / 100));
+                  headlineDiscMap[pid] = disc;
+                  continue;
+                }
+              }
+            } catch {
+              // fallback below
+            }
+          }
+
+          // For Growth/Pro: use packages.price as monthly base + max discount from durations
           const pkgPrice = Number(matchedPkg?.price ?? 0);
           if (pkgPrice > 0) {
             basePriceMap[pid] = pkgPrice;
@@ -326,10 +364,12 @@ export default function MyPackage() {
               if (Number.isFinite(d) && d > maxDisc) maxDisc = d;
             }
             discountedMap[pid] = maxDisc > 0 ? Math.max(0, pkgPrice * (1 - maxDisc / 100)) : pkgPrice;
+            headlineDiscMap[pid] = maxDisc;
           }
         }
         setBasePriceByPackageId(basePriceMap);
         setDiscountedMonthlyByPackageId(discountedMap);
+        setHeadlineDiscountByPackageId(headlineDiscMap);
       }
 
       // Fetch add-ons for the current package + upgrade packages (Onboarding add-ons)
@@ -824,7 +864,7 @@ export default function MyPackage() {
 
                     const base = basePriceByPackageId[pid] ?? Number(activePackage.packages.price ?? 0);
                     const discounted = discountedMonthlyByPackageId[pid];
-                    const discountPercent = maxDiscountByPackageId[pid] ?? 0;
+                    const discountPercent = headlineDiscountByPackageId[pid] ?? maxDiscountByPackageId[pid] ?? 0;
                     const hasPlan = base > 0 && discountPercent > 0;
 
                     if (!hasPlan) {
@@ -1053,7 +1093,7 @@ export default function MyPackage() {
 
                   const base = basePriceByPackageId[pid] ?? Number(pkg.price ?? 0);
                   const discounted = discountedMonthlyByPackageId[pid];
-                  const discountPercent = maxDiscountByPackageId[pid] ?? 0;
+                  const discountPercent = headlineDiscountByPackageId[pid] ?? maxDiscountByPackageId[pid] ?? 0;
                   const hasPlan = base > 0 && discountPercent > 0;
 
                   if (!hasPlan) {
