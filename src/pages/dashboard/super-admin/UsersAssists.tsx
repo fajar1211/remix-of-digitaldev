@@ -49,6 +49,7 @@ type AccountRow = {
   role: string;
   paymentActive: boolean;
   accountStatus: string;
+  expiresAt: string | null;
 };
 
 type SortKey = "name" | "email" | "role" | "account_status";
@@ -133,12 +134,13 @@ export default function SuperAdminUsersAssists() {
   const fetchAccounts = async () => {
     setLoading(true);
     try {
-      const [{ data: profiles, error: profilesError }, { data: roles, error: rolesError }] = await Promise.all([
+      const [{ data: profiles, error: profilesError }, { data: roles, error: rolesError }, { data: userPkgs }] = await Promise.all([
         supabase
           .from("profiles")
           .select("id,name,email,payment_active,account_status")
           .order("created_at", { ascending: false }),
         supabase.from("user_roles").select("user_id,role"),
+        (supabase as any).from("user_packages").select("user_id,expires_at").order("created_at", { ascending: false }),
       ]);
 
       if (profilesError) throw profilesError;
@@ -146,6 +148,13 @@ export default function SuperAdminUsersAssists() {
 
       const roleByUserId = new Map<string, string>();
       (roles as RoleRow[] | null)?.forEach((r) => roleByUserId.set(String(r.user_id), String(r.role)));
+
+      // Build map of latest expires_at per user
+      const expiresMap = new Map<string, string | null>();
+      ((userPkgs as any[] | null) ?? []).forEach((up: any) => {
+        const uid = String(up.user_id);
+        if (!expiresMap.has(uid)) expiresMap.set(uid, up.expires_at ?? null);
+      });
 
       const mapped: AccountRow[] = ((profiles as ProfileRow[] | null) ?? []).map((p) => {
         const role = roleByUserId.get(String(p.id)) ?? "unknown";
@@ -156,6 +165,7 @@ export default function SuperAdminUsersAssists() {
           role,
           accountStatus: String((p as any).account_status ?? "pending"),
           paymentActive: Boolean((p as any).payment_active ?? false),
+          expiresAt: expiresMap.get(String(p.id)) ?? null,
         };
       });
 
@@ -343,6 +353,13 @@ export default function SuperAdminUsersAssists() {
     </TableHead>
   );
 
+  const formatExpiry = (iso: string | null) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("en-GB");
+  };
+
   const renderTable = (showExpireAction: boolean) => (
     <Table>
       <TableHeader>
@@ -350,13 +367,14 @@ export default function SuperAdminUsersAssists() {
           {renderSortableHead("name", "Name")}
           {renderSortableHead("email", "Email")}
           {renderSortableHead("account_status", "Status")}
+          {showExpireAction && <TableHead>Expires</TableHead>}
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {sorted.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={4} className="text-muted-foreground">
+            <TableCell colSpan={showExpireAction ? 5 : 4} className="text-muted-foreground">
               No accounts found.
             </TableCell>
           </TableRow>
@@ -366,6 +384,9 @@ export default function SuperAdminUsersAssists() {
               <TableCell className="font-medium">{r.name}</TableCell>
               <TableCell>{r.email}</TableCell>
               <TableCell>{renderStatusBadge(getAccountStatus(r), r.role)}</TableCell>
+              {showExpireAction && (
+                <TableCell className="text-sm text-muted-foreground">{formatExpiry(r.expiresAt)}</TableCell>
+              )}
               <TableCell className="text-right space-x-2">
                 {showExpireAction && (
                   <Button size="sm" variant="destructive" onClick={() => openExpireCalendar(r)}>
