@@ -51,21 +51,21 @@ function formatDate(iso: string) {
   }
 }
 
-function addOnsSummary(addOns: Record<string, number> | null) {
+function addOnsSummary(addOns: Record<string, number> | null, addOnLabels: Map<string, string>) {
   if (!addOns || typeof addOns !== "object") return "—";
   const entries = Object.entries(addOns).filter(([, v]) => v > 0);
   if (entries.length === 0) return "—";
-  return entries.map(([k, v]) => `${k}: ${v}`).join(", ");
+  return entries.map(([k, v]) => `${addOnLabels.get(k) || k}: ${v}`).join(", ");
 }
 
-function subscriptionAddOnsSummary(subs: Record<string, boolean> | null) {
+function subscriptionAddOnsSummary(subs: Record<string, boolean> | null, addOnLabels: Map<string, string>) {
   if (!subs || typeof subs !== "object") return "—";
   const entries = Object.entries(subs).filter(([, v]) => v);
   if (entries.length === 0) return "—";
-  return entries.map(([k]) => k).join(", ");
+  return entries.map(([k]) => addOnLabels.get(k) || k).join(", ");
 }
 
-function LeadTable({ leads, showDomain, onDelete }: { leads: OrderLead[]; showDomain: boolean; onDelete: (id: string) => void }) {
+function LeadTable({ leads, showDomain, onDelete, addOnLabels }: { leads: OrderLead[]; showDomain: boolean; onDelete: (id: string) => void; addOnLabels: Map<string, string> }) {
   if (leads.length === 0) {
     return <p className="text-sm text-muted-foreground py-4">Belum ada data.</p>;
   }
@@ -109,10 +109,10 @@ function LeadTable({ leads, showDomain, onDelete }: { leads: OrderLead[]; showDo
                 {lead.subscription_years ? `${lead.subscription_years} tahun` : "—"}
               </td>
               <td className="px-3 py-2 text-foreground text-xs max-w-[200px] truncate" title={
-                [addOnsSummary(lead.add_ons), subscriptionAddOnsSummary(lead.subscription_add_ons)]
+                [addOnsSummary(lead.add_ons, addOnLabels), subscriptionAddOnsSummary(lead.subscription_add_ons, addOnLabels)]
                   .filter(s => s !== "—").join(" | ") || "—"
               }>
-                {[addOnsSummary(lead.add_ons), subscriptionAddOnsSummary(lead.subscription_add_ons)]
+                {[addOnsSummary(lead.add_ons, addOnLabels), subscriptionAddOnsSummary(lead.subscription_add_ons, addOnLabels)]
                   .filter(s => s !== "—").join(" | ") || "—"}
               </td>
               <td className="px-3 py-2 text-foreground whitespace-nowrap">
@@ -165,18 +165,28 @@ function LeadTable({ leads, showDomain, onDelete }: { leads: OrderLead[]; showDo
 export default function FollowUp() {
   const [loading, setLoading] = useState(false);
   const [leads, setLeads] = useState<OrderLead[]>([]);
+  const [addOnLabels, setAddOnLabels] = useState<Map<string, string>>(new Map());
   const { toast } = useToast();
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await (supabase as any)
-        .from("order_leads")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      setLeads((data ?? []) as OrderLead[]);
+      const [leadsRes, pkgAddOnsRes, subAddOnsRes] = await Promise.all([
+        (supabase as any).from("order_leads").select("*").order("created_at", { ascending: false }).limit(200),
+        (supabase as any).from("package_add_ons").select("id,label"),
+        (supabase as any).from("subscription_add_ons").select("id,label"),
+      ]);
+      if (leadsRes.error) throw leadsRes.error;
+      setLeads((leadsRes.data ?? []) as OrderLead[]);
+
+      const labelsMap = new Map<string, string>();
+      for (const row of (pkgAddOnsRes.data ?? []) as any[]) {
+        if (row?.id && row?.label) labelsMap.set(row.id, row.label);
+      }
+      for (const row of (subAddOnsRes.data ?? []) as any[]) {
+        if (row?.id && row?.label) labelsMap.set(row.id, row.label);
+      }
+      setAddOnLabels(labelsMap);
     } catch (e) {
       console.error("FollowUp fetch error:", e);
     } finally {
@@ -238,7 +248,7 @@ export default function FollowUp() {
               <CardTitle className="text-base">Order Website</CardTitle>
             </CardHeader>
             <CardContent>
-              <LeadTable leads={websiteLeads} showDomain onDelete={handleDelete} />
+              <LeadTable leads={websiteLeads} showDomain onDelete={handleDelete} addOnLabels={addOnLabels} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -249,7 +259,7 @@ export default function FollowUp() {
               <CardTitle className="text-base">Order Marketing</CardTitle>
             </CardHeader>
             <CardContent>
-              <LeadTable leads={marketingLeads} showDomain={false} onDelete={handleDelete} />
+              <LeadTable leads={marketingLeads} showDomain={false} onDelete={handleDelete} addOnLabels={addOnLabels} />
             </CardContent>
           </Card>
         </TabsContent>

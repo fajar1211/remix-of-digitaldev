@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     const body = (await req.json()) as Partial<Payload>;
 
     const amount_usd = asPositiveNumber(body.amount_usd);
-    const subscription_years = asPositiveInt(body.subscription_years, 10);
+    const subscription_years = asPositiveNumber(body.subscription_years);
     const promo_code = String(body.promo_code ?? "").trim().slice(0, 64) || null;
     const domain = String(body.domain ?? "").trim().slice(0, 253) || null;
     const selected_template_id = String(body.selected_template_id ?? "").trim().slice(0, 80) || null;
@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
         customer_email,
         customer_name,
         status: "pending",
-        billing_cycle: `${subscription_years}y`,
+        billing_cycle: subscription_years >= 1 ? `${subscription_years}y` : `${Math.round(subscription_years * 12)}m`,
         subscription_years,
         promo_code,
         amount_usd,
@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
          external_id,
          amount: amount_idr,
          currency: "IDR",
-         description: `Order ${domain || "Marketing"} (${subscription_years} tahun) – Rp ${amount_idr.toLocaleString("id-ID")}`,
+         description: `Order ${domain || "Marketing"} (${subscription_years >= 1 ? `${subscription_years} tahun` : `${Math.round(subscription_years * 12)} bulan`}) – Rp ${amount_idr.toLocaleString("id-ID")}`,
          payer_email: customer_email,
          customer: {
            given_names: customer_name,

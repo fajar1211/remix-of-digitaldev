@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const xenditInvoicePayloadSchema = z.object({
   amount_idr: z.number().finite().positive(),
-  subscription_years: z.number().int().positive(),
+  subscription_years: z.number().positive(),
   promo_code: z.string().trim().max(64).optional().default(""),
   domain: z.string().trim().max(253).optional().default(""),
   selected_template_id: z.string().trim().max(128).optional().default(""),
