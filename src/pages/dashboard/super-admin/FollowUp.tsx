@@ -108,7 +108,7 @@ function LeadTable({ leads, showDomain, onDelete, addOnLabels }: { leads: OrderL
               <td className="px-3 py-2 text-foreground whitespace-nowrap">
                 {lead.subscription_years ? `${lead.subscription_years} tahun` : "—"}
               </td>
-              <td className="px-3 py-2 text-foreground text-xs max-w-[250px]">
+              <td className="px-3 py-2 text-foreground text-xs">
                 {(() => {
                   const parts: string[] = [];
                   if (lead.add_ons && typeof lead.add_ons === "object") {
@@ -124,7 +124,7 @@ function LeadTable({ leads, showDomain, onDelete, addOnLabels }: { leads: OrderL
                   if (parts.length === 0) return "—";
                   return (
                     <ul className="list-disc list-inside space-y-0.5">
-                      {parts.map((p, i) => <li key={i}>{p}</li>)}
+                      {parts.map((p, i) => <li key={i} className="whitespace-nowrap">{p}</li>)}
                     </ul>
                   );
                 })()}
