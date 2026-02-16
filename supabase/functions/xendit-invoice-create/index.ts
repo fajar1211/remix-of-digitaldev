@@ -103,6 +103,9 @@ Deno.serve(async (req) => {
      const external_id = `ema-xendit-${crypto.randomUUID()}`;
 
     // Create DB order first (reuse existing schema; store provider as xendit).
+    // subscription_years column is integer; store rounded value (minimum 1).
+    const subscriptionYearsInt = Math.max(1, Math.round(subscription_years));
+
     const { data: orderRow, error: orderErr } = await admin
       .from("orders")
       .insert({
@@ -112,7 +115,7 @@ Deno.serve(async (req) => {
         customer_name,
         status: "pending",
         billing_cycle: subscription_years >= 1 ? `${subscription_years}y` : `${Math.round(subscription_years * 12)}m`,
-        subscription_years,
+        subscription_years: subscriptionYearsInt,
         promo_code,
         amount_usd,
         amount_idr,
