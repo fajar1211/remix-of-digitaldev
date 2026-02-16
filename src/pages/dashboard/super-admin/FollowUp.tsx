@@ -123,9 +123,9 @@ function LeadTable({ leads, showDomain, onDelete, addOnLabels }: { leads: OrderL
                   }
                   if (parts.length === 0) return "—";
                   return (
-                    <div className="flex flex-col gap-0.5">
-                      {parts.map((p, i) => <span key={i}>{p}</span>)}
-                    </div>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      {parts.map((p, i) => <li key={i}>{p}</li>)}
+                    </ul>
                   );
                 })()}
               </td>
