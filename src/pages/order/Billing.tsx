@@ -258,7 +258,11 @@ export default function Billing() {
                 {state.subscriptionYears ? (
                   <div className="flex items-center justify-between gap-4">
                     <dt className="text-muted-foreground">Durasi</dt>
-                    <dd className="font-medium text-foreground">{state.subscriptionYears} tahun</dd>
+                    <dd className="font-medium text-foreground">
+                      {Number(state.subscriptionYears) >= 1
+                        ? `${state.subscriptionYears} tahun`
+                        : `${Math.round(Number(state.subscriptionYears) * 12)} bulan`}
+                    </dd>
                   </div>
                 ) : null}
                 {durationPriceIdr != null ? (

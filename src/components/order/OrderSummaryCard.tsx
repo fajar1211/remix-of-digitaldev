@@ -14,7 +14,7 @@ function isMonthlyPackageName(name: string | null) {
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
-  return n.includes("full digital marketing") || n.includes("blog + social media") || n.includes("blog+social media");
+  return n.includes("full digital marketing") || n.includes("blog + social media") || n.includes("blog+social media") || n.includes("content marketing");
 }
 
 export function OrderSummaryCard({
@@ -73,9 +73,13 @@ export function OrderSummaryCard({
   })();
 
   const yearsLabel = state.subscriptionYears
-    ? lang === "id"
-      ? `${state.subscriptionYears} tahun`
-      : `${state.subscriptionYears} year(s)`
+    ? Number(state.subscriptionYears) >= 1
+      ? lang === "id"
+        ? `${state.subscriptionYears} tahun`
+        : `${state.subscriptionYears} year(s)`
+      : lang === "id"
+        ? `${Math.round(Number(state.subscriptionYears) * 12)} bulan`
+        : `${Math.round(Number(state.subscriptionYears) * 12)} month(s)`
     : "—";
 
   const isMonthly = isMonthlyPackageName(state.selectedPackageName);
