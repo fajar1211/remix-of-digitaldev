@@ -71,7 +71,7 @@ function LeadTable({ leads, showDomain, onDelete, addOnLabels }: { leads: OrderL
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <div className="rounded-lg border overflow-auto resize" style={{ minHeight: 120, maxHeight: "80vh" }}>
       <table className="w-full text-sm">
         <thead className="bg-muted/40">
           <tr>
@@ -108,12 +108,26 @@ function LeadTable({ leads, showDomain, onDelete, addOnLabels }: { leads: OrderL
               <td className="px-3 py-2 text-foreground whitespace-nowrap">
                 {lead.subscription_years ? `${lead.subscription_years} tahun` : "—"}
               </td>
-              <td className="px-3 py-2 text-foreground text-xs max-w-[200px] truncate" title={
-                [addOnsSummary(lead.add_ons, addOnLabels), subscriptionAddOnsSummary(lead.subscription_add_ons, addOnLabels)]
-                  .filter(s => s !== "—").join(" | ") || "—"
-              }>
-                {[addOnsSummary(lead.add_ons, addOnLabels), subscriptionAddOnsSummary(lead.subscription_add_ons, addOnLabels)]
-                  .filter(s => s !== "—").join(" | ") || "—"}
+              <td className="px-3 py-2 text-foreground text-xs max-w-[250px]">
+                {(() => {
+                  const parts: string[] = [];
+                  if (lead.add_ons && typeof lead.add_ons === "object") {
+                    Object.entries(lead.add_ons).filter(([, v]) => (v as number) > 0).forEach(([k, v]) => {
+                      parts.push(`${addOnLabels.get(k) || k}: ${v}`);
+                    });
+                  }
+                  if (lead.subscription_add_ons && typeof lead.subscription_add_ons === "object") {
+                    Object.entries(lead.subscription_add_ons).filter(([, v]) => v).forEach(([k]) => {
+                      parts.push(addOnLabels.get(k) || k);
+                    });
+                  }
+                  if (parts.length === 0) return "—";
+                  return (
+                    <div className="flex flex-col gap-0.5">
+                      {parts.map((p, i) => <span key={i}>{p}</span>)}
+                    </div>
+                  );
+                })()}
               </td>
               <td className="px-3 py-2 text-foreground whitespace-nowrap">
                 {[lead.first_name, lead.last_name].filter(Boolean).join(" ") || "—"}
