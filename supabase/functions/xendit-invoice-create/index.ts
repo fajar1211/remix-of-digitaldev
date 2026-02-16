@@ -90,8 +90,8 @@ Deno.serve(async (req) => {
     const amount_usd = asPositiveNumber(body.amount_usd);
     const subscription_years = asPositiveInt(body.subscription_years, 10);
     const promo_code = String(body.promo_code ?? "").trim().slice(0, 64) || null;
-    const domain = asTrimmedString(body.domain, 253);
-    const selected_template_id = asTrimmedString(body.selected_template_id, 80);
+    const domain = String(body.domain ?? "").trim().slice(0, 253) || null;
+    const selected_template_id = String(body.selected_template_id ?? "").trim().slice(0, 80) || null;
     const selected_template_name = String(body.selected_template_name ?? "").trim().slice(0, 120) || null;
     const customer_name = asTrimmedString(body.customer_name, 120);
     const customer_email = asEmail(body.customer_email);
@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
     const { data: orderRow, error: orderErr } = await admin
       .from("orders")
       .insert({
-        domain,
+        domain: domain || "no-domain",
         design: selected_template_name,
         customer_email,
         customer_name,
@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
          external_id,
          amount: amount_idr,
          currency: "IDR",
-         description: `Order ${domain} (${subscription_years} tahun) – Rp ${amount_idr.toLocaleString("id-ID")}`,
+         description: `Order ${domain || "Marketing"} (${subscription_years} tahun) – Rp ${amount_idr.toLocaleString("id-ID")}`,
          payer_email: customer_email,
          customer: {
            given_names: customer_name,
