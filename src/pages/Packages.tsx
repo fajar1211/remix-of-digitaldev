@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { PublicLayout } from "@/components/layout/PublicLayout";
 import { PageHero } from "@/components/layout/PageHero";
@@ -666,19 +667,21 @@ export default function Packages() {
           <div className="mx-auto max-w-2xl text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground">{t("packages.faqTitle")}</h2>
           </div>
-          <div className="mx-auto max-w-3xl space-y-6">
+          <Accordion type="single" collapsible className="mx-auto max-w-3xl space-y-4">
             {(faqs.length
               ? faqs.map((f) => ({ q: f.question, a: f.answer, id: f.id }))
               : fallbackFaqs
             ).map((faq) => (
-              <Card key={faq.id} className="shadow-soft">
-                <CardContent className="pt-6">
-                  <h3 className="font-semibold text-foreground mb-2">{faq.q}</h3>
+              <AccordionItem key={faq.id} value={faq.id} className="border rounded-lg shadow-soft bg-card px-4">
+                <AccordionTrigger className="font-semibold text-foreground text-left">
+                  {faq.q}
+                </AccordionTrigger>
+                <AccordionContent>
                   <FaqAnswer text={faq.a} />
-                </CardContent>
-              </Card>
+                </AccordionContent>
+              </AccordionItem>
             ))}
-          </div>
+          </Accordion>
         </div>
       </section>
 
