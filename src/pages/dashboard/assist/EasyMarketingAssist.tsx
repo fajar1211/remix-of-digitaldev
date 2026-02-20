@@ -32,7 +32,7 @@ export default function EasyMarketingAssist() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">EasyMarketingAssist</h1>
+        <h1 className="text-3xl font-bold text-foreground">DigitalDev</h1>
         <p className="text-muted-foreground">Manage main website content.</p>
       </div>
 
