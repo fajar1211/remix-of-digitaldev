@@ -174,16 +174,25 @@ export default function SuperAdminCms() {
     }
   };
 
+  const parseWhoapiApiKey = (input: string): string => {
+    const raw = String(input ?? "").trim();
+    if (!raw) throw new Error("API key is required.");
+
+    const unquoted = raw.replace(/^['"]|['"]$/g, "").trim();
+    const tokenStyle = unquoted.match(/^(?:token|api[_-]?key)\s*=\s*(.+)$/i);
+    const candidate = (tokenStyle ? tokenStyle[1] : unquoted).replace(/^['"]|['"]$/g, "").trim();
+
+    if (!candidate) throw new Error("API key is required.");
+    if (/\s/.test(candidate)) throw new Error("Invalid API key.");
+
+    return candidate;
+  };
+
   const onSaveWhoapiKey = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const v = whoapiKey.trim();
-      if (!v) throw new Error("API key is required.");
-      if (/\s/.test(v)) throw new Error("Invalid API key.");
-      if (/^[a-f0-9]{64}$/i.test(v)) {
-        throw new Error("API key terlihat seperti hash, bukan key asli WhoAPI. Paste key asli dari dashboard WhoAPI.");
-      }
+      const v = parseWhoapiApiKey(whoapiKey);
 
       const { error } = await invokeWithAuth<any>("super-admin-whoapi-secret", { action: "set", api_key: v });
       if (error) throw error;

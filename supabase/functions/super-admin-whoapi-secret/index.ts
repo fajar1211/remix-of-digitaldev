@@ -31,6 +31,14 @@ async function requireSuperAdmin(admin: any, userId: string) {
   return { ok: true as const, userId };
 }
 
+function normalizeWhoapiApiKey(raw: unknown): string {
+  const text = String(raw ?? "").trim();
+  const unquoted = text.replace(/^['"]|['"]$/g, "").trim();
+  const tokenStyle = unquoted.match(/^(?:token|api[_-]?key)\s*=\s*(.+)$/i);
+  const candidate = (tokenStyle ? tokenStyle[1] : unquoted).replace(/^['"]|['"]$/g, "").trim();
+  return candidate;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -97,7 +105,7 @@ Deno.serve(async (req) => {
     }
 
     if (body.action === "set") {
-      const apiKey = String((body as any).api_key ?? "").trim();
+      const apiKey = normalizeWhoapiApiKey((body as any).api_key);
       if (!apiKey) {
         return new Response(JSON.stringify({ error: "api_key is required" }), {
           status: 400,
@@ -111,17 +119,6 @@ Deno.serve(async (req) => {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
-      }
-
-      // Guard against accidental hashed values (common copy/paste mistake).
-      if (/^[a-f0-9]{64}$/i.test(apiKey)) {
-        return new Response(
-          JSON.stringify({ error: "API key looks like a hash, not a valid WhoAPI key. Please paste the original key from WhoAPI dashboard." }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
       }
 
       const { error } = await admin.from("integration_secrets").upsert(
