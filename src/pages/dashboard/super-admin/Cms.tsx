@@ -181,6 +181,9 @@ export default function SuperAdminCms() {
       const v = whoapiKey.trim();
       if (!v) throw new Error("API key is required.");
       if (/\s/.test(v)) throw new Error("Invalid API key.");
+      if (/^[a-f0-9]{64}$/i.test(v)) {
+        throw new Error("API key terlihat seperti hash, bukan key asli WhoAPI. Paste key asli dari dashboard WhoAPI.");
+      }
 
       const { error } = await invokeWithAuth<any>("super-admin-whoapi-secret", { action: "set", api_key: v });
       if (error) throw error;
