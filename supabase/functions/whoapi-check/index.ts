@@ -65,44 +65,52 @@ Deno.serve(async (req) => {
       });
     }
 
-    const url = new URL("https://api.whoapi.com/");
-    url.searchParams.set("apikey", apiKey);
-    url.searchParams.set("r", "whois");
+    const authToken = /^token=/i.test(apiKey) ? apiKey : `TOKEN=${apiKey}`;
+
+    const url = new URL("https://whoisjson.com/api/v1/domain-availability");
     url.searchParams.set("domain", domain);
 
     const resp = await fetch(url.toString(), {
-      headers: { Accept: "application/json" },
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: authToken,
+      },
     });
     const json = await resp.json().catch(() => null);
 
-    // WhoAPI returns status field: 0 = success, non-0 = error
-    const whoapiStatus = (json as any)?.status;
-    if (whoapiStatus !== undefined && whoapiStatus !== 0) {
-      const statusDesc = (json as any)?.status_desc ?? `WhoAPI error (status ${whoapiStatus})`;
+    if (!resp.ok) {
+      const msgFromBody =
+        (json && ((json as any).error || (json as any).message || (json as any).detail)) ||
+        `WhoisJSON request failed (${resp.status})`;
       const normalizedError =
-        Number(whoapiStatus) === 12
-          ? "Invalid WhoAPI key. Please recheck the key/token in Integrations, then save again."
-          : statusDesc;
+        resp.status === 401 || resp.status === 403
+          ? "Invalid WhoisJSON token. Please check token di Integrations lalu simpan ulang."
+          : String(msgFromBody);
 
       return new Response(JSON.stringify({ error: normalizedError, raw: json }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!resp.ok) {
-      const msg = (json && (json as any).error) ? String((json as any).error) : `WhoAPI request failed (${resp.status})`;
-      return new Response(JSON.stringify({ error: msg, raw: json }), {
         status: resp.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // WhoAPI whois response has "registered" at root level
-    const registered = (json as any)?.registered;
-    const registeredStr = typeof registered === "string" ? registered.toLowerCase() : null;
+    const availableRaw =
+      (json as any)?.available ?? (json as any)?.availability ?? (json as any)?.is_available ?? (json as any)?.data?.available;
+    const registeredRaw = (json as any)?.registered ?? (json as any)?.data?.registered;
+
+    const availableStr = typeof availableRaw === "string" ? availableRaw.toLowerCase() : null;
+    const registeredStr = typeof registeredRaw === "string" ? registeredRaw.toLowerCase() : null;
+
     const status =
-      registeredStr === "no" ? "available" : registeredStr === "yes" ? "unavailable" : ("unknown" as const);
+      availableRaw === true || availableStr === "true" || availableStr === "available"
+        ? "available"
+        : availableRaw === false || availableStr === "false" || availableStr === "unavailable" || availableStr === "taken"
+          ? "unavailable"
+          : registeredStr === "yes" || registeredStr === "true"
+            ? "unavailable"
+            : registeredStr === "no" || registeredStr === "false"
+              ? "available"
+              : ("unknown" as const);
 
     return new Response(
       JSON.stringify({

@@ -179,8 +179,9 @@ export default function SuperAdminCms() {
     if (!raw) throw new Error("API key is required.");
 
     const unquoted = raw.replace(/^['"]|['"]$/g, "").trim();
-    const tokenStyle = unquoted.match(/^(?:token|api[_-]?key)\s*=\s*(.+)$/i);
-    const candidate = (tokenStyle ? tokenStyle[1] : unquoted).replace(/^['"]|['"]$/g, "").trim();
+    const withoutAuthPrefix = unquoted.replace(/^authorization\s*:\s*/i, "").trim();
+    const tokenStyle = withoutAuthPrefix.match(/^(?:token|api[_-]?key)\s*=\s*(.+)$/i);
+    const candidate = (tokenStyle ? tokenStyle[1] : withoutAuthPrefix).replace(/^['"]|['"]$/g, "").trim();
 
     if (!candidate) throw new Error("API key is required.");
     if (/\s/.test(candidate)) throw new Error("Invalid API key.");
