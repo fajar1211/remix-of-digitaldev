@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Mail, KeyRound } from "lucide-react";
 import { DomainDuckIntegrationCard, type DomainDuckTestResult } from "@/components/super-admin/DomainDuckIntegrationCard";
+import { WhoapiIntegrationCard, type WhoapiTestResult } from "@/components/super-admin/WhoapiIntegrationCard";
 import { Ga4IntegrationCard } from "@/components/super-admin/Ga4IntegrationCard";
 import { GscIntegrationCard } from "@/components/super-admin/GscIntegrationCard";
 import { SitemapIntegrationCard } from "@/components/super-admin/SitemapIntegrationCard";
@@ -59,6 +60,13 @@ export default function SuperAdminCms() {
   const [xenditConfigured, setXenditConfigured] = useState(false);
   const [xenditEnabled, setXenditEnabled] = useState(true);
   const [xenditUpdatedAt, setXenditUpdatedAt] = useState<string | null>(null);
+
+  // WhoAPI state
+  const [whoapiKey, setWhoapiKey] = useState("");
+  const [whoapiConfigured, setWhoapiConfigured] = useState(false);
+  const [whoapiUpdatedAt, setWhoapiUpdatedAt] = useState<string | null>(null);
+  const [whoapiTestDomain, setWhoapiTestDomain] = useState("example.com");
+  const [whoapiTestResult, setWhoapiTestResult] = useState<WhoapiTestResult | null>(null);
 
   const fetchXenditStatus = async () => {
     setLoading(true);
@@ -146,8 +154,99 @@ export default function SuperAdminCms() {
     }
   };
 
+  const fetchWhoapiStatus = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await invokeWithAuth<any>("super-admin-whoapi-secret", { action: "get" });
+      if (error) throw error;
+      setWhoapiConfigured(Boolean((data as any)?.configured));
+      setWhoapiUpdatedAt(((data as any)?.updated_at ?? null) as string | null);
+    } catch (e: any) {
+      console.error(e);
+      if (String(e?.message ?? "").toLowerCase().includes("unauthorized")) {
+        toast.error("Your session has expired. Please sign in again.");
+        navigate("/super-admin/login", { replace: true });
+        return;
+      }
+      toast.error(e?.message || "Unable to load WhoAPI status.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onSaveWhoapiKey = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const v = whoapiKey.trim();
+      if (!v) throw new Error("API key is required.");
+      if (/\s/.test(v)) throw new Error("Invalid API key.");
+
+      const { error } = await invokeWithAuth<any>("super-admin-whoapi-secret", { action: "set", api_key: v });
+      if (error) throw error;
+
+      setWhoapiKey("");
+      toast.success("WhoAPI key has been saved.");
+      await fetchWhoapiStatus();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || "Unable to save WhoAPI key.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onClearWhoapiKey = async () => {
+    setLoading(true);
+    try {
+      const { error } = await invokeWithAuth<any>("super-admin-whoapi-secret", { action: "clear" });
+      if (error) throw error;
+      toast.success("WhoAPI key has been reset.");
+      setWhoapiTestResult(null);
+      await fetchWhoapiStatus();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || "Unable to reset WhoAPI key.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onTestWhoapi = async () => {
+    setLoading(true);
+    setWhoapiTestResult(null);
+    try {
+      const d = whoapiTestDomain.trim();
+      if (!d) throw new Error("Test domain is required.");
+
+      const { data, error } = await supabase.functions.invoke<any>("whoapi-check", { body: { domain: d } });
+      if (error) {
+        const resp = (error as any)?.context?.response;
+        if (resp) {
+          const payload = await resp.json().catch(() => null);
+          throw new Error(payload?.error || error.message);
+        }
+        throw error;
+      }
+
+      const status = String((data as any)?.status ?? "unknown") as any;
+      const registered = (data as any)?.registered ?? null;
+      setWhoapiTestResult({ domain: d, status, registered: typeof registered === "string" ? registered : null });
+
+      if (status === "available") toast.success("Available");
+      else if (status === "unavailable") toast.error("Unavailable");
+      else toast.message(`Status: ${status}`);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || "WhoAPI test failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchDomainDuckStatus();
+    fetchWhoapiStatus();
     fetchGa4Status();
     fetchGscStatus();
     fetchXenditStatus();
@@ -427,6 +526,20 @@ export default function SuperAdminCms() {
           onTestDomainChange={setDomainduckTestDomain}
           onTest={onTestDomainDuck}
           testResult={domainduckTestResult}
+        />
+
+        <WhoapiIntegrationCard
+          loading={loading}
+          status={{ configured: whoapiConfigured, updatedAt: whoapiUpdatedAt }}
+          apiKeyValue={whoapiKey}
+          onApiKeyChange={setWhoapiKey}
+          onSave={onSaveWhoapiKey}
+          onRefresh={fetchWhoapiStatus}
+          onClear={onClearWhoapiKey}
+          testDomainValue={whoapiTestDomain}
+          onTestDomainChange={setWhoapiTestDomain}
+          onTest={onTestWhoapi}
+          testResult={whoapiTestResult}
         />
 
         <Ga4IntegrationCard
