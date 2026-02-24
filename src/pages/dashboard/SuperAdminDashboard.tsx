@@ -48,16 +48,24 @@ export default function SuperAdminDashboard() {
   const location = useLocation();
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
+  const [unreadLeadsCount, setUnreadLeadsCount] = useState(0);
 
-  // Fetch pending user count for badge
+  // Fetch pending user count + unread leads count for badges
   useEffect(() => {
     (async () => {
       try {
-        const { count } = await supabase
-          .from("profiles")
-          .select("id", { count: "exact", head: true })
-          .eq("account_status", "pending" as any);
-        setPendingCount(count ?? 0);
+        const [profilesRes, leadsRes] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("id", { count: "exact", head: true })
+            .eq("account_status", "pending" as any),
+          (supabase as any)
+            .from("order_leads")
+            .select("id", { count: "exact", head: true })
+            .eq("is_read", false),
+        ]);
+        setPendingCount(profilesRes.count ?? 0);
+        setUnreadLeadsCount(leadsRes.count ?? 0);
       } catch { /* ignore */ }
     })();
   }, []);
@@ -72,13 +80,13 @@ export default function SuperAdminDashboard() {
       { title: "Duration Packages", url: "/dashboard/super-admin/duration-packages", icon: Activity },
       { title: "Payments", url: "/dashboard/super-admin/payments", icon: CreditCard },
       { title: "Promotions", url: "/dashboard/super-admin/promotions", icon: BadgePercent },
-      { title: "Follow Up", url: "/dashboard/super-admin/follow-up", icon: FileSearch },
+      { title: "Follow Up", url: "/dashboard/super-admin/follow-up", icon: FileSearch, badge: unreadLeadsCount },
       { title: "Reports (soon)", url: "/dashboard/super-admin/reports", icon: BookOpen },
       { title: "Integrations", url: "/dashboard/super-admin/integrations", icon: BookOpen },
       { title: "System Settings (soon)", url: "/dashboard/super-admin/system-settings", icon: Settings },
       { title: "My Account", url: "/dashboard/super-admin/my-account", icon: Shield },
     ],
-    [pendingCount]
+    [pendingCount, unreadLeadsCount]
   );
 
   useEffect(() => {
