@@ -5,8 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { RefreshCw, Trash2 } from "lucide-react";
+import { RefreshCw, Trash2, MailOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { LeadDetailDialog } from "./follow-up/LeadDetailDialog";
 
 type OrderLead = {
   id: string;
@@ -31,6 +32,7 @@ type OrderLead = {
   amount_idr: number | null;
   promo_code: string | null;
   status: string;
+  is_read: boolean;
 };
 
 function formatIdr(value: number) {
@@ -40,32 +42,26 @@ function formatIdr(value: number) {
 function formatDate(iso: string) {
   try {
     return new Date(iso).toLocaleString("id-ID", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+      day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
     });
-  } catch {
-    return iso;
-  }
+  } catch { return iso; }
 }
 
-function addOnsSummary(addOns: Record<string, number> | null, addOnLabels: Map<string, string>) {
-  if (!addOns || typeof addOns !== "object") return "—";
-  const entries = Object.entries(addOns).filter(([, v]) => v > 0);
-  if (entries.length === 0) return "—";
-  return entries.map(([k, v]) => `${addOnLabels.get(k) || k}: ${v}`).join(", ");
-}
-
-function subscriptionAddOnsSummary(subs: Record<string, boolean> | null, addOnLabels: Map<string, string>) {
-  if (!subs || typeof subs !== "object") return "—";
-  const entries = Object.entries(subs).filter(([, v]) => v);
-  if (entries.length === 0) return "—";
-  return entries.map(([k]) => addOnLabels.get(k) || k).join(", ");
-}
-
-function LeadTable({ leads, showDomain, onDelete, addOnLabels }: { leads: OrderLead[]; showDomain: boolean; onDelete: (id: string) => void; addOnLabels: Map<string, string> }) {
+function LeadTable({
+  leads,
+  showDomain,
+  onDelete,
+  onClickLead,
+  onMarkUnread,
+  addOnLabels,
+}: {
+  leads: OrderLead[];
+  showDomain: boolean;
+  onDelete: (id: string) => void;
+  onClickLead: (lead: OrderLead) => void;
+  onMarkUnread: (id: string) => void;
+  addOnLabels: Map<string, string>;
+}) {
   if (leads.length === 0) {
     return <p className="text-sm text-muted-foreground py-4">Belum ada data.</p>;
   }
@@ -97,10 +93,19 @@ function LeadTable({ leads, showDomain, onDelete, addOnLabels }: { leads: OrderL
         </thead>
         <tbody>
           {leads.map((lead) => (
-            <tr key={lead.id} className="border-t">
-              <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{formatDate(lead.created_at)}</td>
+            <tr
+              key={lead.id}
+              className={`border-t cursor-pointer transition-colors hover:bg-muted/30 ${!lead.is_read ? "bg-primary/5 font-semibold" : ""}`}
+              onClick={() => onClickLead(lead)}
+            >
+              <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                <span className="flex items-center gap-1.5">
+                  {!lead.is_read && <span className="inline-block h-2 w-2 rounded-full bg-primary shrink-0" />}
+                  {formatDate(lead.created_at)}
+                </span>
+              </td>
               {showDomain && (
-                <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap">{lead.domain || "—"}</td>
+                <td className="px-3 py-2 text-foreground whitespace-nowrap">{lead.domain || "—"}</td>
               )}
               <td className="px-3 py-2 text-foreground whitespace-nowrap">
                 {showDomain ? (lead.template_name || "—") : (lead.package_name || "—")}
@@ -145,28 +150,41 @@ function LeadTable({ leads, showDomain, onDelete, addOnLabels }: { leads: OrderL
                   {lead.status}
                 </Badge>
               </td>
-              <td className="px-3 py-2 text-center whitespace-nowrap">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
+              <td className="px-3 py-2 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-center gap-1">
+                  {lead.is_read && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      title="Tandai belum dibaca"
+                      onClick={() => onMarkUnread(lead.id)}
+                    >
+                      <MailOpen className="h-4 w-4" />
                     </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Hapus data lead?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Data ini akan dihapus secara permanen dari database. Apakah Anda yakin?
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Tidak</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => onDelete(lead.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                        Ya, Hapus
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                  )}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Hapus data lead?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Data ini akan dihapus secara permanen dari database. Apakah Anda yakin?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Tidak</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onDelete(lead.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          Ya, Hapus
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </td>
             </tr>
           ))}
@@ -180,6 +198,7 @@ export default function FollowUp() {
   const [loading, setLoading] = useState(false);
   const [leads, setLeads] = useState<OrderLead[]>([]);
   const [addOnLabels, setAddOnLabels] = useState<Map<string, string>>(new Map());
+  const [selectedLead, setSelectedLead] = useState<OrderLead | null>(null);
   const { toast } = useToast();
 
   const refresh = useCallback(async () => {
@@ -208,24 +227,52 @@ export default function FollowUp() {
     }
   }, []);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   const handleDelete = useCallback(async (id: string) => {
     try {
       const { error } = await (supabase as any).from("order_leads").delete().eq("id", id);
       if (error) throw error;
       setLeads((prev) => prev.filter((l) => l.id !== id));
+      if (selectedLead?.id === id) setSelectedLead(null);
       toast({ title: "Data berhasil dihapus" });
     } catch (e) {
       console.error("Delete lead error:", e);
       toast({ variant: "destructive", title: "Gagal menghapus data" });
     }
+  }, [toast, selectedLead]);
+
+  const markAsRead = useCallback(async (lead: OrderLead) => {
+    if (lead.is_read) return;
+    try {
+      await (supabase as any).from("order_leads").update({ is_read: true }).eq("id", lead.id);
+      setLeads((prev) => prev.map((l) => l.id === lead.id ? { ...l, is_read: true } : l));
+    } catch (e) {
+      console.error("Mark read error:", e);
+    }
+  }, []);
+
+  const markAsUnread = useCallback(async (id: string) => {
+    try {
+      await (supabase as any).from("order_leads").update({ is_read: false }).eq("id", id);
+      setLeads((prev) => prev.map((l) => l.id === id ? { ...l, is_read: false } : l));
+      toast({ title: "Ditandai belum dibaca" });
+    } catch (e) {
+      console.error("Mark unread error:", e);
+      toast({ variant: "destructive", title: "Gagal mengubah status" });
+    }
   }, [toast]);
+
+  const handleClickLead = useCallback((lead: OrderLead) => {
+    setSelectedLead(lead);
+    markAsRead(lead);
+  }, [markAsRead]);
 
   const websiteLeads = useMemo(() => leads.filter((l) => l.flow_type === "website"), [leads]);
   const marketingLeads = useMemo(() => leads.filter((l) => l.flow_type === "marketing"), [leads]);
+
+  const unreadWebsite = useMemo(() => websiteLeads.filter((l) => !l.is_read).length, [websiteLeads]);
+  const unreadMarketing = useMemo(() => marketingLeads.filter((l) => !l.is_read).length, [marketingLeads]);
 
   return (
     <div className="space-y-6">
@@ -245,13 +292,17 @@ export default function FollowUp() {
           <TabsTrigger value="website">
             Website
             {websiteLeads.length > 0 && (
-              <Badge variant="secondary" className="ml-2">{websiteLeads.length}</Badge>
+              <Badge variant={unreadWebsite > 0 ? "default" : "secondary"} className="ml-2">
+                {unreadWebsite > 0 ? `${unreadWebsite} baru` : websiteLeads.length}
+              </Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="marketing">
             Marketing
             {marketingLeads.length > 0 && (
-              <Badge variant="secondary" className="ml-2">{marketingLeads.length}</Badge>
+              <Badge variant={unreadMarketing > 0 ? "default" : "secondary"} className="ml-2">
+                {unreadMarketing > 0 ? `${unreadMarketing} baru` : marketingLeads.length}
+              </Badge>
             )}
           </TabsTrigger>
         </TabsList>
@@ -262,7 +313,7 @@ export default function FollowUp() {
               <CardTitle className="text-base">Order Website</CardTitle>
             </CardHeader>
             <CardContent>
-              <LeadTable leads={websiteLeads} showDomain onDelete={handleDelete} addOnLabels={addOnLabels} />
+              <LeadTable leads={websiteLeads} showDomain onDelete={handleDelete} onClickLead={handleClickLead} onMarkUnread={markAsUnread} addOnLabels={addOnLabels} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -273,11 +324,18 @@ export default function FollowUp() {
               <CardTitle className="text-base">Order Marketing</CardTitle>
             </CardHeader>
             <CardContent>
-              <LeadTable leads={marketingLeads} showDomain={false} onDelete={handleDelete} addOnLabels={addOnLabels} />
+              <LeadTable leads={marketingLeads} showDomain={false} onDelete={handleDelete} onClickLead={handleClickLead} onMarkUnread={markAsUnread} addOnLabels={addOnLabels} />
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      <LeadDetailDialog
+        lead={selectedLead}
+        open={!!selectedLead}
+        onOpenChange={(open) => { if (!open) setSelectedLead(null); }}
+        addOnLabels={addOnLabels}
+      />
     </div>
   );
 }
