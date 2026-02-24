@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
       const statusDesc = (json as any)?.status_desc ?? `WhoAPI error (status ${whoapiStatus})`;
       const normalizedError =
         Number(whoapiStatus) === 12
-          ? "Invalid WhoAPI key. Save the original key from WhoAPI dashboard (not hashed/encoded value)."
+          ? "Invalid WhoAPI key. Please recheck the key/token in Integrations, then save again."
           : statusDesc;
 
       return new Response(JSON.stringify({ error: normalizedError, raw: json }), {
