@@ -63,52 +63,56 @@ export function useDomainSuggestions(query: string, { enabled = true, debounceMs
         const results = await Promise.all(
           candidates.map(async (domain) => {
             try {
-              const { data, error } = await supabase.functions.invoke("domainduck-check", {
+              const { data, error } = await supabase.functions.invoke("whoapi-check", {
                 body: { domain },
               });
-              if (error) throw error;
-              const availability = String((data as any)?.availability ?? "").toLowerCase();
+              if (error) {
+                // Try to extract error body from non-2xx responses
+                const resp = (error as any)?.context?.response;
+                if (resp) {
+                  const payload = await resp.json().catch(() => null);
+                  throw new Error(payload?.error || error.message);
+                }
+                throw error;
+              }
+              const status = String((data as any)?.status ?? "unknown").toLowerCase();
               return {
                 domain,
-                availability,
+                status,
               } as const;
             } catch (e: any) {
               return {
                 domain,
-                availability: "error",
+                status: "error",
                 error: e?.message ?? "Failed",
               } as const;
             }
           }),
         );
 
-        const statusFromAvailability = (availability: string): DomainSuggestionStatus => {
-          switch (availability) {
-            case "true":
+        const statusFromResult = (s: string): DomainSuggestionStatus => {
+          switch (s) {
+            case "available":
               return "available";
-            case "false":
+            case "unavailable":
               return "unavailable";
-            case "premium":
-              return "premium";
-            case "blocked":
-              return "blocked";
             default:
               return "unknown";
           }
         };
 
         const items: DomainSuggestionItem[] = results
-          .filter((r) => r.availability !== "error")
+          .filter((r) => r.status !== "error")
           .map((r) => ({
             domain: r.domain,
-            status: statusFromAvailability(r.availability),
+            status: statusFromResult(r.status),
             price_usd: null,
             currency: null,
           }));
 
         // If all calls failed, surface one representative error
-        const allFailed = results.every((r) => r.availability === "error");
-        const firstErr = results.find((r: any) => r.availability === "error") as any;
+        const allFailed = results.every((r) => r.status === "error");
+        const firstErr = results.find((r: any) => r.status === "error") as any;
 
         setState({
           loading: false,
