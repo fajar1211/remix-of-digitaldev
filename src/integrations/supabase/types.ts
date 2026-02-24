@@ -992,6 +992,7 @@ export type Database = {
           first_name: string | null
           flow_type: string
           id: string
+          is_read: boolean
           last_name: string | null
           package_id: string | null
           package_name: string | null
@@ -1018,6 +1019,7 @@ export type Database = {
           first_name?: string | null
           flow_type?: string
           id?: string
+          is_read?: boolean
           last_name?: string | null
           package_id?: string | null
           package_name?: string | null
@@ -1044,6 +1046,7 @@ export type Database = {
           first_name?: string | null
           flow_type?: string
           id?: string
+          is_read?: boolean
           last_name?: string | null
           package_id?: string | null
           package_name?: string | null
