@@ -117,7 +117,7 @@ export const dict: Dict = {
   // Payment
   "order.loadingPayment": { id: "Memuat opsi pembayaran…", en: "Loading payment options…" },
   "order.gatewayInactiveTitle": { id: "Gateway pembayaran belum aktif", en: "Payment gateway is not active" },
-  "order.gatewayInactiveBody": { id: "Saat ini belum ada gateway pembayaran yang terkonfigurasi (Xendit/PayPal/Midtrans). Silakan aktifkan salah satu gateway di dashboard Super Admin, lalu kembali ke halaman ini.", en: "No payment gateway is configured yet (Xendit/PayPal/Midtrans). Please enable one in Super Admin, then return to this page." },
+  "order.gatewayInactiveBody": { id: "Saat ini belum ada gateway pembayaran yang terkonfigurasi (Xendit). Silakan aktifkan gateway di dashboard Super Admin, lalu kembali ke halaman ini.", en: "No payment gateway is configured yet (Xendit). Please enable one in Super Admin, then return to this page." },
   "order.configStatus": { id: "Status konfigurasi", en: "Configuration status" },
   "order.paymentMethod": { id: "Metode pembayaran", en: "Payment method" },
   "order.card": { id: "Kartu", en: "Card" },
@@ -148,17 +148,10 @@ export const dict: Dict = {
   "order.confirmAndPay": { id: "Konfirmasi & Bayar", en: "Confirm & Pay" },
   "order.confirmContinue": { id: "Konfirmasi & Lanjut", en: "Confirm & Continue" },
   "order.redirectXendit": { id: "Kamu akan diarahkan ke checkout Xendit Invoice.", en: "You will be redirected to Xendit Invoice checkout." },
-  "order.midtransIdrNote": { id: "Saat verifikasi 3DS, Midtrans mungkin menampilkan nominal dalam IDR.", en: "During 3DS verification, Midtrans may display the amount in IDR." },
   "order.payWithXendit": { id: "Bayar via Xendit", en: "Pay with Xendit" },
-  "order.payWithCard": { id: "Bayar dengan Kartu", en: "Pay with Card" },
-  "order.paypalLoading": { id: "Memuat PayPal…", en: "Loading PayPal…" },
-  "order.paypalNotReady": { id: "PayPal belum bisa dipakai. Pastikan domain, template, dan total sudah siap.", en: "PayPal can't be used yet. Make sure domain, template, and total are ready." },
-  "order.paypalNotConfigured": { id: "Belum dikonfigurasi", en: "Not configured" },
   "order.paymentFailedTitle": { id: "Pembayaran gagal", en: "Payment failed" },
   "order.paymentCreatedTitle": { id: "Pembayaran dibuat", en: "Payment created" },
   "order.totalNotAvailableTitle": { id: "Total belum tersedia", en: "Total not available" },
-  "order.midtransNotReadyTitle": { id: "Midtrans belum siap", en: "Midtrans is not ready" },
-  "order.pleaseWaitTryAgain": { id: "Tunggu sebentar lalu coba lagi.", en: "Please wait a moment and try again." },
   "order.tryAgain": { id: "Silakan coba lagi.", en: "Please try again." },
 
   // Generic
