@@ -113,6 +113,17 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Guard against accidental hashed values (common copy/paste mistake).
+      if (/^[a-f0-9]{64}$/i.test(apiKey)) {
+        return new Response(
+          JSON.stringify({ error: "API key looks like a hash, not a valid WhoAPI key. Please paste the original key from WhoAPI dashboard." }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
       const { error } = await admin.from("integration_secrets").upsert(
         {
           provider: "whoapi",
