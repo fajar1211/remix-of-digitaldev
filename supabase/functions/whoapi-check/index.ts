@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const url = new URL("http://api.whoapi.com/");
+    const url = new URL("https://api.whoapi.com/");
     url.searchParams.set("apikey", apiKey);
     url.searchParams.set("r", "whois");
     url.searchParams.set("domain", domain);
@@ -75,6 +75,16 @@ Deno.serve(async (req) => {
     });
     const json = await resp.json().catch(() => null);
 
+    // WhoAPI returns status field: 0 = success, non-0 = error
+    const whoapiStatus = (json as any)?.status;
+    if (whoapiStatus !== undefined && whoapiStatus !== 0) {
+      const statusDesc = (json as any)?.status_desc ?? `WhoAPI error (status ${whoapiStatus})`;
+      return new Response(JSON.stringify({ error: statusDesc, raw: json }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (!resp.ok) {
       const msg = (json && (json as any).error) ? String((json as any).error) : `WhoAPI request failed (${resp.status})`;
       return new Response(JSON.stringify({ error: msg, raw: json }), {
@@ -83,7 +93,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const registered = (json as any)?.whois?.registered;
+    // WhoAPI whois response has "registered" at root level
+    const registered = (json as any)?.registered;
     const registeredStr = typeof registered === "string" ? registered.toLowerCase() : null;
     const status =
       registeredStr === "no" ? "available" : registeredStr === "yes" ? "unavailable" : ("unknown" as const);
