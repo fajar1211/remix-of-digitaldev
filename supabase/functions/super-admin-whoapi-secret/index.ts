@@ -34,8 +34,9 @@ async function requireSuperAdmin(admin: any, userId: string) {
 function normalizeWhoapiApiKey(raw: unknown): string {
   const text = String(raw ?? "").trim();
   const unquoted = text.replace(/^['"]|['"]$/g, "").trim();
-  const tokenStyle = unquoted.match(/^(?:token|api[_-]?key)\s*=\s*(.+)$/i);
-  const candidate = (tokenStyle ? tokenStyle[1] : unquoted).replace(/^['"]|['"]$/g, "").trim();
+  const withoutAuthPrefix = unquoted.replace(/^authorization\s*:\s*/i, "").trim();
+  const tokenStyle = withoutAuthPrefix.match(/^(?:token|api[_-]?key)\s*=\s*(.+)$/i);
+  const candidate = (tokenStyle ? tokenStyle[1] : withoutAuthPrefix).replace(/^['"]|['"]$/g, "").trim();
   return candidate;
 }
 
